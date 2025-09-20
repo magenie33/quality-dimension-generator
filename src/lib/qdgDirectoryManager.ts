@@ -264,6 +264,111 @@ ${generatedDimensions}
 	}
 
 	/**
+	 * 保存简洁的单文件输出：纯净的任务描述和评价维度
+	 */
+	async saveCleanOutput(
+		projectPath: string, 
+		taskId: string, 
+		refinedTaskDescription: string, 
+		dimensionsContent: string
+	): Promise<string> {
+		try {
+			const taskDir = this.getTaskDirectory(projectPath, taskId);
+			
+			// 确保任务目录存在
+			await fs.mkdir(taskDir, { recursive: true });
+			
+			// 定义输出文件路径
+			const outputFilePath = join(taskDir, `${taskId}_output.md`);
+			
+			// 创建简洁的文件内容：只包含纯净的两个输出
+			const cleanContent = `# 任务描述
+
+${refinedTaskDescription}
+
+---
+
+# 评价维度
+
+${dimensionsContent}`;
+			
+			// 写入文件
+			await fs.writeFile(outputFilePath, cleanContent, { encoding: 'utf-8' });
+			
+			// 验证文件创建成功
+			const fileStats = await fs.stat(outputFilePath);
+			
+			if (fileStats.size === 0) {
+				throw new Error('文件写入失败：文件大小为0');
+			}
+			
+			console.log(`✅ 简洁输出已保存: ${outputFilePath} (${fileStats.size} 字节)`);
+			
+			return outputFilePath;
+			
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error('❌ 保存简洁输出失败:', errorMessage);
+			throw new Error(`保存简洁输出失败: ${errorMessage}`);
+		}
+	}
+
+	/**
+	 * 保存双文件输出：任务描述和评价维度的纯净版本
+	 * 返回两个独立的md文件路径
+	 */
+	async saveDualOutputFiles(
+		projectPath: string, 
+		taskId: string, 
+		refinedTaskDescription: string, 
+		dimensionsContent: string
+	): Promise<{ taskFilePath: string; dimensionsFilePath: string }> {
+		try {
+			const taskDir = this.getTaskDirectory(projectPath, taskId);
+			
+			// 确保任务目录存在
+			await fs.mkdir(taskDir, { recursive: true });
+			
+			// 定义两个文件路径
+			const taskFilePath = join(taskDir, `${taskId}_task.md`);
+			const dimensionsFilePath = join(taskDir, `${taskId}_dimensions.md`);
+			
+			// 创建纯净的任务描述文件
+			const taskContent = refinedTaskDescription;
+			
+			// 创建纯净的评价维度文件
+			const dimensionsFileContent = dimensionsContent;
+			
+			// 并行写入两个文件
+			await Promise.all([
+				fs.writeFile(taskFilePath, taskContent, { encoding: 'utf-8' }),
+				fs.writeFile(dimensionsFilePath, dimensionsFileContent, { encoding: 'utf-8' })
+			]);
+			
+			// 验证文件创建成功
+			const [taskStats, dimensionsStats] = await Promise.all([
+				fs.stat(taskFilePath),
+				fs.stat(dimensionsFilePath)
+			]);
+			
+			if (taskStats.size === 0 || dimensionsStats.size === 0) {
+				throw new Error('文件写入失败：文件大小为0');
+			}
+			
+			console.log(`✅ 双文件输出已保存:`);
+			console.log(`📄 任务文件: ${taskFilePath} (${taskStats.size} 字节)`);
+			console.log(`⭐ 维度文件: ${dimensionsFilePath} (${dimensionsStats.size} 字节)`);
+			
+			return { taskFilePath, dimensionsFilePath };
+			
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error('❌ 保存双文件输出失败:', errorMessage);
+			throw new Error(`保存双文件输出失败: ${errorMessage}`);
+		}
+	}
+
+	/**
 	 * 保存最终的评价维度标准（专用于save_quality_dimensions工具）
 	 */
 	async saveFinalDimensionStandards(projectPath: string, taskId: string, task: any, refinedTaskDescription: string, dimensionsContent: string): Promise<string> {
@@ -314,8 +419,9 @@ ${dimensionsContent}
 			// 写入最终文件
 			await fs.writeFile(dimensionPath, finalContent, { encoding: 'utf-8' });
 			
-			// 验证文件写入成功
+			// 验证文件写入成功并读取确认
 			const fileStats = await fs.stat(dimensionPath);
+			
 			if (fileStats.size === 0) {
 				throw new Error('文件写入失败：文件大小为0');
 			}

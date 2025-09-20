@@ -348,7 +348,7 @@ ${prompt}
 	if (isToolEnabled('get_current_time_context')) {
 		server.tool(
 			"get_current_time_context",
-			"获取当前基本的时间上下文信息（不含主观判断）",
+			"获取当前基本的时间上下文信息",
 			{
 				timezone: z.string().optional().describe("时区"),
 				locale: z.string().default(finalConfig.language).describe("本地化设置")
@@ -403,11 +403,10 @@ ${prompt}
 						}
 					}
 					
-					// 保存完整的评价维度标准
-					const dimensionFilePath = await qdgManager.saveFinalDimensionStandards(
+					// 保存简洁的单文件输出：纯净的任务描述和评价维度
+					const outputFilePath = await qdgManager.saveCleanOutput(
 						projectPath, 
 						taskId, 
-						task, 
 						refinedTaskDescription,
 						dimensionsContent
 					);
@@ -415,7 +414,7 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: `✅ 评价维度标准已成功保存！\n\n🎯 任务ID: ${taskId}\n📁 保存路径: ${path.relative(projectPath, dimensionFilePath)}\n📋 状态: 已保存LLM提炼的任务描述和评价标准\n\n🚀 现在可以开始执行任务，完成后根据保存的标准进行评价！`
+							text: `✅ 质量评价标准已成功保存！\n\n🎯 任务ID: ${taskId}\n📁 保存文件: ${path.relative(projectPath, outputFilePath)}\n📋 状态: 纯净的任务描述和评价标准已保存\n\n🚀 现在可以开始执行任务，完成后根据保存的标准进行评价！`
 						}]
 					};
 				} catch (error) {

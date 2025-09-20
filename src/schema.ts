@@ -126,7 +126,7 @@ export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
  */
 export const TIME_CONTEXT_TOOL: Tool = {
 	name: 'get_current_time_context',
-	description: '获取当前基本的时间上下文信息（自动检测系统时区，不含主观判断）',
+	description: '获取当前基本的时间上下文信息（自动检测系统时区）',
 	inputSchema: {
 		type: 'object',
 		properties: {
