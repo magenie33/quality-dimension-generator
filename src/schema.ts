@@ -52,17 +52,22 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 };
 
 /**
- * 质量维度生成工具 - 支持可配置维度数量和6-8-10评分指导系统
+ * 质量维度提示词生成工具
  */
-export const QUALITY_DIMENSIONS_TOOL: Tool = {
+export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 	name: 'generate_quality_dimensions_prompt',
-	description: '生成质量维度提示词，让LLM根据任务和时间背景生成专业评价维度。自动开始任务追踪。',
+	description: '生成质量维度提示词并创建任务记录，让LLM根据任务生成专业评价维度',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			taskAnalysisJson: {
 				type: 'string',
 				description: '任务分析的JSON结果'
+			},
+			targetScore: {
+				type: 'number',
+				description: '目标分数（0-10分制，用于指导评价标准的严格程度）',
+				default: 8
 			},
 			timezone: {
 				type: 'string',
@@ -75,19 +80,7 @@ export const QUALITY_DIMENSIONS_TOOL: Tool = {
 			},
 			projectPath: {
 				type: 'string',
-				description: '项目路径（可选，用于任务追踪）'
-			},
-			includePatterns: {
-				type: 'array',
-				items: { type: 'string' },
-				description: '要追踪的文件模式',
-				default: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.json", "**/*.md", "**/*.yml", "**/*.yaml"]
-			},
-			excludePatterns: {
-				type: 'array',
-				items: { type: 'string' },
-				description: '要排除的文件模式',
-				default: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**", "**/coverage/**"]
+				description: '项目路径（可选，用于保存任务记录）'
 			}
 		},
 		required: ['taskAnalysisJson']
@@ -95,62 +88,36 @@ export const QUALITY_DIMENSIONS_TOOL: Tool = {
 };
 
 /**
- * 任务评价提示词生成工具 - 简化版（不需循环改进）
+ * 质量维度保存工具 - 保存LLM的双输出结果
  */
-export const TASK_EVALUATION_PROMPT_TOOL: Tool = {
-	name: 'generate_task_evaluation_prompt',
-	description: '完成任务评价，检测变更并生成基于变更的评价提示词',
+export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
+	name: 'save_quality_dimensions',
+	description: '保存LLM生成的任务提炼和评价维度标准到.qdg目录',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			taskId: {
 				type: 'string',
-				description: '任务ID（从start_task_tracking或generate_quality_dimensions_prompt获得）'
-			},
-			evaluationDimensionsJson: {
-				type: 'string',
-				description: '评价维度的JSON数组'
-			},
-			originalTask: {
-				type: 'string',
-				description: '原始任务描述（可选，会覆盖跟踪时的任务描述）'
-			}
-		},
-		required: ['taskId', 'evaluationDimensionsJson']
-	}
-};
-
-/**
- * 任务跟踪工具
- */
-export const TASK_TRACKING_TOOL: Tool = {
-	name: 'start_task_tracking',
-	description: '开始任务跟踪，记录当前项目状态作为基准',
-	inputSchema: {
-		type: 'object',
-		properties: {
-			taskDescription: {
-				type: 'string',
-				description: '任务描述'
+				description: '任务ID'
 			},
 			projectPath: {
 				type: 'string',
 				description: '项目路径'
 			},
-			includePatterns: {
-				type: 'array',
-				items: { type: 'string' },
-				description: '要监控的文件模式',
-				default: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.json", "**/*.md", "**/*.yml", "**/*.yaml"]
+			refinedTaskDescription: {
+				type: 'string',
+				description: 'LLM提炼后的任务描述（第一个环节的output）'
 			},
-			excludePatterns: {
-				type: 'array',
-				items: { type: 'string' },
-				description: '要排除的文件模式',
-				default: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**", "**/coverage/**", "**/tmp/**"]
+			dimensionsContent: {
+				type: 'string',
+				description: 'LLM生成的完整评价维度内容（第二个环节的output）'
+			},
+			taskAnalysisJson: {
+				type: 'string',
+				description: '原始任务分析JSON（可选，用于基础信息）'
 			}
 		},
-		required: ['taskDescription', 'projectPath']
+		required: ['taskId', 'projectPath', 'refinedTaskDescription', 'dimensionsContent']
 	}
 };
 
@@ -159,13 +126,13 @@ export const TASK_TRACKING_TOOL: Tool = {
  */
 export const TIME_CONTEXT_TOOL: Tool = {
 	name: 'get_current_time_context',
-	description: '获取当前基本的时间上下文信息（不含主观判断）',
+	description: '获取当前基本的时间上下文信息（自动检测系统时区，不含主观判断）',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			timezone: {
 				type: 'string',
-				description: '时区（可选）'
+				description: '时区（可选，不指定则自动检测系统时区）'
 			},
 			locale: {
 				type: 'string',
@@ -176,6 +143,34 @@ export const TIME_CONTEXT_TOOL: Tool = {
 	}
 };
 
-// 注意：以下工具已在简化版本中移除：
-// - generate_improvement_prompt：已移除，不再支持循环改进
-// - generate_iterative_improvement_prompt：已移除，不再支持循环改进
+/**
+ * 诊断工作目录工具
+ */
+export const DIAGNOSE_WORKING_DIRECTORY_TOOL: Tool = {
+	name: 'diagnose_working_directory',
+	description: '诊断当前工作目录和MCP服务器运行环境，帮助解决路径相关问题',
+	inputSchema: {
+		type: 'object',
+		properties: {}
+	}
+};
+
+/**
+ * 工具导出 - 按使用频率排序
+ */
+export const ALL_TOOLS = [
+	TASK_ANALYSIS_PROMPT_TOOL,         // 第1步：分析任务
+	QUALITY_DIMENSIONS_PROMPT_TOOL,    // 第2步：生成提示词
+	SAVE_QUALITY_DIMENSIONS_TOOL,      // 第3步：保存LLM输出
+	TIME_CONTEXT_TOOL,                 // 辅助：时间上下文
+	DIAGNOSE_WORKING_DIRECTORY_TOOL    // 辅助：诊断工具
+] as const;
+
+/**
+ * 核心工作流程工具（推荐使用顺序）
+ */
+export const CORE_WORKFLOW_TOOLS = [
+	TASK_ANALYSIS_PROMPT_TOOL,
+	QUALITY_DIMENSIONS_PROMPT_TOOL,
+	SAVE_QUALITY_DIMENSIONS_TOOL
+] as const;

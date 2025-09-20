@@ -93,14 +93,11 @@ export class QdgDirectoryManager {
 			await fs.access(mainConfigPath);
 			// 文件已存在，不覆盖
 		} catch {
-			// 文件不存在，创建默认配置（只包含可配置项）
+			// 文件不存在，创建默认配置（只包含设置项）
 			const defaultConfig = {
-				version: "1.0.0",
-				created: new Date().toISOString(),
 				settings: {
-					// 可配置项
-					dimensionCount: 5, // 默认5个维度
-					expectedScore: 8   // 默认期望8分
+					dimensionCount: 5,    // 默认5个维度
+					expectedScore: 8      // 默认期望8分
 				}
 			};
 			
@@ -256,13 +253,79 @@ ${generatedDimensions}
 			const content = await fs.readFile(configPath, 'utf-8');
 			return JSON.parse(content);
 		} catch {
-			// 返回默认配置（只包含可配置项）
+			// 返回默认配置（只包含设置项）
 			return {
 				settings: {
-					dimensionCount: 5, // 默认5个维度
-					expectedScore: 8   // 默认期望8分
+					dimensionCount: 5,    // 默认5个维度
+					expectedScore: 8      // 默认期望8分
 				}
 			};
+		}
+	}
+
+	/**
+	 * 保存最终的评价维度标准（专用于save_quality_dimensions工具）
+	 */
+	async saveFinalDimensionStandards(projectPath: string, taskId: string, task: any, refinedTaskDescription: string, dimensionsContent: string): Promise<string> {
+		try {
+			const taskDir = this.getTaskDirectory(projectPath, taskId);
+			const dimensionPath = this.getDimensionPath(projectPath, taskId);
+			
+			// 确保任务目录存在
+			await fs.mkdir(taskDir, { recursive: true });
+			
+			// 验证目录创建成功
+			const dirStats = await fs.stat(taskDir);
+			if (!dirStats.isDirectory()) {
+				throw new Error(`任务目录创建失败: ${taskDir}`);
+			}
+			
+			// 生成最终的评价标准文档（包含两个LLM输出）
+			const finalContent = `# 质量评价标准
+
+## 📋 任务提炼（第一个环节输出）
+
+${refinedTaskDescription}
+
+---
+
+## ⭐ 评价维度体系（第二个环节输出）
+
+${dimensionsContent}
+
+---
+
+## � 使用说明
+
+**任务ID**: ${taskId}  
+**生成时间**: ${new Date().toLocaleString('zh-CN')}
+
+**评分方式**: 每个维度可给0-10分任意数字（包括小数点）  
+**参考标准**: 6分及格、8分优秀、10分卓越  
+**最终分数**: 所有维度得分的平均值
+
+**状态**: ✅ 任务提炼和评价标准已完成，可开始执行任务
+
+---
+
+*Quality Dimension Generator - 双环节输出完整版*
+`;
+			
+			// 写入最终文件
+			await fs.writeFile(dimensionPath, finalContent, { encoding: 'utf-8' });
+			
+			// 验证文件写入成功
+			const fileStats = await fs.stat(dimensionPath);
+			if (fileStats.size === 0) {
+				throw new Error('文件写入失败：文件大小为0');
+			}
+			
+			console.log(`✅ 最终评价标准已保存: ${dimensionPath} (${fileStats.size} 字节)`);
+			return dimensionPath;
+			
+		} catch (error) {
+			console.error('保存最终评价标准失败:', error);
+			throw new Error(`保存最终评价标准失败: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 }

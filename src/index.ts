@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { 
 	TaskAnalysis,
 	TimeContext,
@@ -223,22 +224,21 @@ ${prompt}
 	if (isToolEnabled('generate_quality_dimensions_prompt')) {
 		server.tool(
 			"generate_quality_dimensions_prompt",
-			"生成质量维度评价标准并保存。如果只提供任务分析，将生成提示词；如果同时提供LLM生成的评价标准，将保存到.qdg文件夹的taskID_dimension.md文件中。",
+			"生成质量维度提示词并创建任务记录",
 			{
 				taskAnalysisJson: z.string().describe("任务分析的JSON结果"),
-				generatedDimensions: z.string().optional().describe("LLM生成的完整评价标准内容（可选，如果提供则直接保存）"),
 				targetScore: z.number().default(8).describe("目标分数（0-10分制，用于指导评价标准的严格程度）"),
 				timezone: z.string().optional().describe("时区"),
 				locale: z.string().default(finalConfig.language).describe("本地化设置"),
 				projectPath: z.string().optional().describe("项目路径（可选，用于保存任务记录）")
 			},
-			async ({ taskAnalysisJson, generatedDimensions, targetScore, timezone, locale, projectPath }) => {
+			async ({ taskAnalysisJson, targetScore, timezone, locale, projectPath }) => {
 				try {
 					// 解析任务分析结果
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
 					
 					// 基于任务内容生成稳定的任务ID（相同任务内容=相同ID）
-					const taskHash = require('crypto').createHash('md5')
+					const taskHash = crypto.createHash('md5')
 						.update(JSON.stringify({
 							coreTask: task.coreTask,
 							taskType: task.taskType,
@@ -252,7 +252,7 @@ ${prompt}
 					const timestamp = Date.now();
 					const taskId = `task_${timestamp}_${taskHash}`;
 					
-					// 获取时间上下文
+					// 获取时间上下文（系统会自动检测时区）
 					const timeContext = timeContextManager.getCurrentTimeContext(timezone, locale);
 					
 					// 检查是否已存在相同任务的文件
@@ -260,8 +260,8 @@ ${prompt}
 					if (projectPath) {
 						try {
 							const tasksDir = path.join(projectPath, '.qdg', 'tasks');
-							if (require('fs').existsSync(tasksDir)) {
-								const taskFolders = require('fs').readdirSync(tasksDir);
+							if (fs.existsSync(tasksDir)) {
+								const taskFolders = fs.readdirSync(tasksDir);
 								// 查找包含相同hash的任务ID
 								existingTaskId = taskFolders.find((folder: string) => 
 									folder.includes(taskHash)
@@ -272,42 +272,13 @@ ${prompt}
 						}
 					}
 					
-					// 如果提供了生成的维度标准，更新现有文件
-					if (generatedDimensions && projectPath) {
-						try {
-							// 确保 .qdg 目录存在
-							await qdgManager.initializeQdgDirectory(projectPath);
-							
-							// 使用现有的taskId（如果存在）或当前的taskId
-							const finalTaskId = existingTaskId || taskId;
-							
-							// 保存LLM生成的完整评价标准
-							const dimensionFilePath = await qdgManager.saveDimensionStandards(projectPath, finalTaskId, task, generatedDimensions);
-							
-							return {
-								content: [{
-									type: "text",
-									text: `✅ 评价标准已成功保存！\n\n🎯 任务ID: ${finalTaskId}\n📁 保存路径: ${path.relative(projectPath, dimensionFilePath)}\n🔄 文件状态: ${existingTaskId ? '已更新现有文件' : '已创建新文件'}\n\n📋 接下来可以：\n1. 开始执行任务\n2. 完成任务后根据保存的标准进行评价\n3. 使用 taskID: ${finalTaskId} 来引用这个评价标准`
-								}]
-							};
-						} catch (saveError) {
-							return {
-								content: [{
-									type: "text",
-									text: `❌ 保存评价标准失败: ${saveError instanceof Error ? saveError.message : String(saveError)}`
-								}],
-								isError: true
-							};
-						}
-					}
-					
-					// 第一次调用：生成提示词并建立MD文件结构（仅在不存在时）
+					// 生成提示词
 					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, projectPath, targetScore);
 					
 					let responseText = prompt;
 					let finalTaskId = taskId;
 					
-					// 如果提供了项目路径，处理.qdg目录和任务MD文件
+					// 如果提供了项目路径，处理.qdg目录和任务记录
 					if (projectPath) {
 						try {
 							// 1. 初始化.qdg目录
@@ -320,79 +291,38 @@ ${prompt}
 								const existingDimensionPath = path.join(projectPath, '.qdg', 'tasks', existingTaskId, `${existingTaskId}_dimension.md`);
 								
 								responseText += `\n\n🔄 发现相同任务的现有记录`;
-								responseText += `\n🎯 使用现有任务ID: ${existingTaskId}`;
-								responseText += `\n📁 现有任务文件: ${path.relative(projectPath, existingDimensionPath)}`;
-								responseText += `\n📋 状态: 使用现有.qdg结构，不创建重复文件`;
+								responseText += `\n🎯 任务ID: ${existingTaskId}`;
+								responseText += `\n📁 现有文件: ${path.relative(projectPath, existingDimensionPath)}`;
+								responseText += `\n📋 状态: 可直接使用 save_quality_dimensions 工具更新评价标准`;
 								
 							} else {
-								// 创建新的任务目录和MD文件
+								// 创建新的任务目录（但不创建MD文件）
 								const taskDir = path.join(projectPath, '.qdg', 'tasks', taskId);
 								await fs.promises.mkdir(taskDir, { recursive: true });
 								
-								const dimensionPath = path.join(taskDir, `${taskId}_dimension.md`);
-								const initialContent = `# 质量评价标准
-
-## 📋 任务信息
-- **任务ID**: ${taskId}
-- **任务Hash**: ${taskHash}
-- **创建时间**: ${new Date().toLocaleString('zh-CN')}
-- **核心任务**: ${task.coreTask || '未指定'}
-- **任务类型**: ${task.taskType || '未指定'}
-- **复杂度**: ${task.complexity || 'N/A'}/5
-- **领域**: ${task.domain || '未指定'}
-
-## 🎯 任务目标
-${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : '无'}
-
-## 🔑 关键要素
-${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : '无'}
-
----
-
-## 📝 生成的提示词
-
-\`\`\`
-${prompt}
-\`\`\`
-
----
-
-## ⭐ 评价维度标准
-
-**状态**: 🕒 等待LLM生成完整的评价标准
-
-**说明**: 
-1. 使用上述提示词让LLM生成完整的评价维度
-2. 生成后，再次调用此工具并提供 \`generatedDimensions\` 参数来保存完整标准
-3. 系统将自动更新本文件为最终版本
-
----
-
-**创建时间**: ${new Date().toISOString()}
-**文档类型**: QDG质量评价标准（初始版本）
-**任务状态**: 📋 已创建新任务记录，等待评价标准生成
-`;
-								
-								// 3. 保存初始MD文件
-								await fs.promises.writeFile(dimensionPath, initialContent, 'utf-8');
-								
-								responseText += `\n\n✅ 新任务记录已创建！`;
+								responseText += `\n\n✅ 新任务目录已创建！`;
 								responseText += `\n🎯 任务ID: ${taskId}`;
-								responseText += `\n📁 任务文件: ${path.relative(projectPath, dimensionPath)}`;
-								responseText += `\n📋 状态: 已建立新的.qdg目录结构和任务MD文件`;
+								responseText += `\n📁 任务目录: ${path.relative(projectPath, taskDir)}`;
+								responseText += `\n📋 状态: 准备接收评价标准`;
 							}
 							
 							responseText += `\n\n📋 下一步操作：`;
-							responseText += `\n1. 请将LLM生成的完整评价标准复制`;
-							responseText += `\n2. 再次调用此工具，提供相同的 taskAnalysisJson 和新增的 generatedDimensions 参数`;
-							responseText += `\n3. 系统将自动更新 ${finalTaskId}_dimension.md 文件为完整版本`;
+							responseText += `\n1. 将上述提示词复制给LLM，让其生成评价维度`;
+							responseText += `\n2. 复制LLM的两个输出部分：`;
+							responseText += `\n   - 提炼后的任务描述（第一个环节）`;
+							responseText += `\n   - 完整的评价维度体系（第二个环节）`;
+							responseText += `\n3. 使用 save_quality_dimensions 工具保存：`;
+							responseText += `\n   - taskId: ${finalTaskId}`;
+							responseText += `\n   - projectPath: ${projectPath}`;
+							responseText += `\n   - refinedTaskDescription: [LLM第一个输出]`;
+							responseText += `\n   - dimensionsContent: [LLM第二个输出]`;
 							
 						} catch (initError) {
-							console.warn('初始化.qdg目录或创建MD文件失败:', initError);
-							responseText += `\n\n⚠️ 警告: 无法创建任务记录文件，但提示词已生成。错误: ${initError instanceof Error ? initError.message : String(initError)}`;
+							console.warn('初始化.qdg目录失败:', initError);
+							responseText += `\n\n⚠️ 警告: 无法创建任务目录，但提示词已生成。错误: ${initError instanceof Error ? initError.message : String(initError)}`;
 						}
 					} else {
-						responseText += `\n\n⚠️ 未提供项目路径，无法建立.qdg目录和任务记录。请提供 projectPath 参数以启用完整功能。`;
+						responseText += `\n\n⚠️ 未提供项目路径，无法建立.qdg目录。请提供 projectPath 参数以启用完整功能。`;
 					}
 					
 					return {
@@ -438,6 +368,61 @@ ${prompt}
 						content: [{
 							type: "text",
 							text: `错误: ${error instanceof Error ? error.message : String(error)}`
+						}],
+						isError: true
+					};
+				}
+			}
+		);
+	}
+
+	// Register: Save Quality Dimensions
+	if (isToolEnabled('save_quality_dimensions')) {
+		server.tool(
+			"save_quality_dimensions",
+			"保存LLM生成的任务提炼和评价维度标准到.qdg目录",
+			{
+				taskId: z.string().describe("任务ID"),
+				projectPath: z.string().describe("项目路径"),
+				refinedTaskDescription: z.string().describe("LLM提炼后的任务描述（第一个环节的output）"),
+				dimensionsContent: z.string().describe("LLM生成的完整评价维度内容（第二个环节的output）"),
+				taskAnalysisJson: z.string().optional().describe("原始任务分析JSON（可选，用于基础信息）")
+			},
+			async ({ taskId, projectPath, refinedTaskDescription, dimensionsContent, taskAnalysisJson }) => {
+				try {
+					// 确保 .qdg 目录存在
+					await qdgManager.initializeQdgDirectory(projectPath);
+					
+					// 解析任务分析（如果提供）
+					let task: any = {};
+					if (taskAnalysisJson) {
+						try {
+							task = JSON.parse(taskAnalysisJson);
+						} catch (parseError) {
+							console.warn('解析taskAnalysisJson失败，继续处理:', parseError);
+						}
+					}
+					
+					// 保存完整的评价维度标准
+					const dimensionFilePath = await qdgManager.saveFinalDimensionStandards(
+						projectPath, 
+						taskId, 
+						task, 
+						refinedTaskDescription,
+						dimensionsContent
+					);
+					
+					return {
+						content: [{
+							type: "text",
+							text: `✅ 评价维度标准已成功保存！\n\n🎯 任务ID: ${taskId}\n📁 保存路径: ${path.relative(projectPath, dimensionFilePath)}\n📋 状态: 已保存LLM提炼的任务描述和评价标准\n\n🚀 现在可以开始执行任务，完成后根据保存的标准进行评价！`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text", 
+							text: `❌ 保存失败: ${error instanceof Error ? error.message : String(error)}`
 						}],
 						isError: true
 					};
