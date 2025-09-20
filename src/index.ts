@@ -272,14 +272,69 @@ ${prompt}
 					// 否则生成提示词
 					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, projectPath, targetScore);
 					
+					// 如果提供了项目路径，初始化.qdg目录并保存任务信息
+					if (projectPath) {
+						try {
+							await qdgManager.initializeQdgDirectory(projectPath);
+							
+							// 保存任务信息和初始提示词到 taskID_dimension.md
+							const taskDir = path.join(projectPath, '.qdg', 'tasks', taskId);
+							await fs.promises.mkdir(taskDir, { recursive: true });
+							
+							const dimensionPath = path.join(taskDir, `${taskId}_dimension.md`);
+							const initialContent = `# 质量评价标准
+
+## 任务信息
+- **任务ID**: ${taskId}
+- **创建时间**: ${new Date().toLocaleString('zh-CN')}
+- **核心任务**: ${task.coreTask || '未指定'}
+- **任务类型**: ${task.taskType || '未指定'}
+- **复杂度**: ${task.complexity || 'N/A'}/5
+- **领域**: ${task.domain || '未指定'}
+
+## 任务目标
+${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : '无'}
+
+## 关键要素
+${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : '无'}
+
+---
+
+## 生成的提示词
+
+\`\`\`
+${prompt}
+\`\`\`
+
+---
+
+## 评价维度
+
+**状态**: 🕒 等待LLM生成评价标准
+
+**说明**: 请将LLM生成的评价标准复制后，再次调用 \`generate_quality_dimensions_prompt\` 工具并提供 \`generatedDimensions\` 参数来完成标准保存。
+
+---
+
+**生成时间**: ${new Date().toISOString()}
+**文档类型**: QDG质量评价标准（初始版本）
+`;
+							
+							await fs.promises.writeFile(dimensionPath, initialContent, 'utf-8');
+							
+						} catch (initError) {
+							console.warn('初始化.qdg目录失败:', initError);
+						}
+					}
+					
 					let responseText = prompt;
 					if (projectPath) {
 						responseText += `\n\n🎯 任务ID: ${taskId}`;
-						responseText += `\n� 项目路径: ${projectPath}`;
+						responseText += `\n📁 项目路径: ${projectPath}`;
 						responseText += `\n\n📋 下一步操作：`;
-						responseText += `\n1. 请将上述提示词发送给LLM，让其生成完整的评价标准`;
-						responseText += `\n2. 然后使用 'save_generated_dimensions' 工具保存LLM生成的标准`;
-						responseText += `\n3. 最后开始执行任务，并在完成后根据保存的标准进行评价`;
+						responseText += `\n1. 请将LLM生成的完整评价标准复制`;
+						responseText += `\n2. 再次调用此工具，提供相同的 taskAnalysisJson 和新增的 generatedDimensions 参数来保存标准`;
+						responseText += `\n3. 使用 taskID: ${taskId} 来保存和引用`;
 					} else {
 						responseText += `\n\n⚠️ 未提供项目路径，无法保存评价标准。请提供 projectPath 参数以启用完整功能。`;
 					}

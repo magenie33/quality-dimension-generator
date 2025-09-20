@@ -137,19 +137,26 @@ export class QdgDirectoryManager {
 		return join(this.getTaskDirectory(projectPath, taskId), `${taskId}_dimension.md`);
 	}
 	/**
-	 * 保存LLM生成的评价维度标准
+	 * 保存LLM生成的评价维度标准（增强版）
 	 */
 	async saveDimensionStandards(projectPath: string, taskId: string, task: any, generatedDimensions: string): Promise<string> {
-		const taskDir = this.getTaskDirectory(projectPath, taskId);
-		const dimensionPath = this.getDimensionPath(projectPath, taskId);
-		
-		// 确保任务目录存在
-		await fs.mkdir(taskDir, { recursive: true });
-		
-		// 生成完整的评价标准文档
-		const standardsContent = `# 质量评价标准
+		try {
+			const taskDir = this.getTaskDirectory(projectPath, taskId);
+			const dimensionPath = this.getDimensionPath(projectPath, taskId);
+			
+			// 确保任务目录存在，多重检查
+			await fs.mkdir(taskDir, { recursive: true });
+			
+			// 验证目录确实创建成功
+			const dirStats = await fs.stat(taskDir);
+			if (!dirStats.isDirectory()) {
+				throw new Error(`任务目录创建失败: ${taskDir}`);
+			}
+			
+			// 生成完整的评价标准文档
+			const standardsContent = `# 质量评价标准
 
-## 任务信息
+## 📋 任务信息
 - **任务ID**: ${taskId}
 - **创建时间**: ${new Date().toLocaleString('zh-CN')}
 - **核心任务**: ${task.coreTask || '未指定'}
@@ -157,31 +164,61 @@ export class QdgDirectoryManager {
 - **复杂度**: ${task.complexity || 'N/A'}/5
 - **领域**: ${task.domain || '未指定'}
 
-## 任务目标
+## 🎯 任务目标
 ${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : '无'}
 
-## 关键要素
+## 🔑 关键要素
 ${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : '无'}
 
 ---
+
+## ⭐ 评价维度标准
 
 ${generatedDimensions}
 
 ---
 
-## 使用说明
+## 📊 使用说明
 
-1. **评分方式**: 每个维度可给0-10分任意数字（包括小数点）
-2. **参考标准**: 6分及格、8分优秀、10分卓越
-3. **最终分数**: 所有维度得分的平均值
-4. **评分要求**: 请根据实际完成情况严格按照上述标准评分
+### 评分方式
+- **分数范围**: 每个维度可给0-10分任意数字（包括小数点）
+- **参考标准**: 6分及格、8分优秀、10分卓越
+- **最终分数**: 所有维度得分的平均值
+- **评分要求**: 请根据实际完成情况严格按照上述标准评分
 
-**生成时间**: ${new Date().toISOString()}
-**文档类型**: QDG质量评价标准
+### 文档信息
+- **生成时间**: ${new Date().toISOString()}
+- **文档类型**: QDG质量评价标准（完整版本）
+- **任务ID**: ${taskId}
+- **状态**: ✅ 已完成标准制定，可开始任务执行
+
+---
+
+*本文档由 Quality Dimension Generator 自动生成和保存*
 `;
-		
-		await fs.writeFile(dimensionPath, standardsContent, 'utf-8');
-		return dimensionPath;
+			
+			// 写入文件，确保编码正确
+			await fs.writeFile(dimensionPath, standardsContent, { encoding: 'utf-8' });
+			
+			// 验证文件确实写入成功
+			const fileStats = await fs.stat(dimensionPath);
+			if (fileStats.size === 0) {
+				throw new Error('文件写入失败：文件大小为0');
+			}
+			
+			// 验证文件内容
+			const savedContent = await fs.readFile(dimensionPath, 'utf-8');
+			if (!savedContent.includes(taskId) || !savedContent.includes(generatedDimensions)) {
+				throw new Error('文件内容验证失败：保存的内容不完整');
+			}
+			
+			console.log(`✅ 评价标准已成功保存: ${dimensionPath} (${fileStats.size} bytes)`);
+			return dimensionPath;
+			
+		} catch (error) {
+			console.error('❌ 保存评价标准失败:', error);
+			throw new Error(`保存评价标准失败: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	/**
