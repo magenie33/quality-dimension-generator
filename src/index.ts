@@ -525,11 +525,12 @@ ${discoveredProjects.length > 0 ? '\n## 🔧 快速修复\n基于发现的.qdg�
 		);
 	}
 
-	return server;
+	return server; // For Smithery deployment, this should be the McpServer instance
 }
 
-// CLI entry point for standalone usage  
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('index.js')) {
+// CLI entry point for standalone usage (only when not imported as module)
+// This block will be removed by bundlers when imported as a module
+if (typeof process !== 'undefined' && process.argv && process.argv[1]?.endsWith('index.js')) {
 	async function main() {
 		const server = createServer({ debug: true, language: "zh-CN" });
 		const transport = new StdioServerTransport();

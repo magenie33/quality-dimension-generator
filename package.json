@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"description": "MCP server for generating quality evaluation dimensions - 专注于为任务生成明确的质量评价标准",
 	"type": "module",
+	"module": "src/index.ts",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"bin": {
@@ -14,12 +15,14 @@
 		"LICENSE"
 	],
 	"scripts": {
-		"build": "tsc",
+		"build": "npx @smithery/cli build",
+		"dev": "npx @smithery/cli dev",
+		"build:tsc": "tsc",
 		"build:unix": "tsc && chmod +x dist/index.js",
 		"build:smithery": "npx @smithery/cli@latest build src/modernIndex.ts --transport stdio",
 		"start": "node dist/index.js",
 		"start:modern": "node dist/modernIndex.js",
-		"dev": "npx @modelcontextprotocol/inspector dist/index.js",
+		"dev:legacy": "npx @modelcontextprotocol/inspector dist/index.js",
 		"dev:modern": "npx @smithery/cli@latest dev src/modernIndex.ts",
 		"test": "node --test",
 		"test:server": "node test/test-server.js",
@@ -51,6 +54,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^22.13.10",
+		"tsx": "^4.20.5",
 		"typescript": "^5.8.2"
 	}
 }
