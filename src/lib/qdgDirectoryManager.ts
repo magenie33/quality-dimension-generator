@@ -325,112 +325,112 @@ ${dimensionsContent}`;
 		try {
 			const taskDir = this.getTaskDirectory(projectPath, taskId);
 			
-			// 确保任务目录存在
+			// Ensure task directory exists
 			await fs.mkdir(taskDir, { recursive: true });
 			
-			// 定义两个文件路径
+			// Define two file paths
 			const taskFilePath = join(taskDir, `${taskId}_task.md`);
 			const dimensionsFilePath = join(taskDir, `${taskId}_dimensions.md`);
 			
-			// 创建纯净的任务描述文件
+			// Create pure task description file
 			const taskContent = refinedTaskDescription;
 			
-			// 创建纯净的评价维度文件
+			// Create pure evaluation dimensions file
 			const dimensionsFileContent = dimensionsContent;
 			
-			// 并行写入两个文件
+			// Write two files in parallel
 			await Promise.all([
 				fs.writeFile(taskFilePath, taskContent, { encoding: 'utf-8' }),
 				fs.writeFile(dimensionsFilePath, dimensionsFileContent, { encoding: 'utf-8' })
 			]);
 			
-			// 验证文件创建成功
+			// Verify file creation succeeded
 			const [taskStats, dimensionsStats] = await Promise.all([
 				fs.stat(taskFilePath),
 				fs.stat(dimensionsFilePath)
 			]);
 			
 			if (taskStats.size === 0 || dimensionsStats.size === 0) {
-				throw new Error('文件写入失败：文件大小为0');
+				throw new Error('File write failed: file size is 0');
 			}
 			
-			console.log(`✅ 双文件输出已保存:`);
-			console.log(`📄 任务文件: ${taskFilePath} (${taskStats.size} 字节)`);
-			console.log(`⭐ 维度文件: ${dimensionsFilePath} (${dimensionsStats.size} 字节)`);
+			console.log(`✅ Dual-file output saved:`);
+			console.log(`📄 Task file: ${taskFilePath} (${taskStats.size} bytes)`);
+			console.log(`⭐ Dimensions file: ${dimensionsFilePath} (${dimensionsStats.size} bytes)`);
 			
 			return { taskFilePath, dimensionsFilePath };
 			
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error('❌ 保存双文件输出失败:', errorMessage);
-			throw new Error(`保存双文件输出失败: ${errorMessage}`);
+			console.error('❌ Failed to save dual-file output:', errorMessage);
+			throw new Error(`Failed to save dual-file output: ${errorMessage}`);
 		}
 	}
 
 	/**
-	 * 保存最终的评价维度标准（专用于save_quality_dimensions工具）
+	 * Save final evaluation dimension standards (dedicated for save_quality_dimensions tool)
 	 */
 	async saveFinalDimensionStandards(projectPath: string, taskId: string, task: any, refinedTaskDescription: string, dimensionsContent: string): Promise<string> {
 		try {
 			const taskDir = this.getTaskDirectory(projectPath, taskId);
 			const dimensionPath = this.getDimensionPath(projectPath, taskId);
 			
-			// 确保任务目录存在
+			// Ensure task directory exists
 			await fs.mkdir(taskDir, { recursive: true });
 			
-			// 验证目录创建成功
+			// Verify directory creation succeeded
 			const dirStats = await fs.stat(taskDir);
 			if (!dirStats.isDirectory()) {
 				throw new Error(`Task directory creation failed: ${taskDir}`);
 			}
 			
 			// Generate final evaluation standards document (containing two LLM outputs)
-			const finalContent = `# 质量评价标准
+			const finalContent = `# Quality Evaluation Standards
 
-## 📋 任务提炼（第一个环节输出）
+## 📋 Task Refinement (First Stage Output)
 
 ${refinedTaskDescription}
 
 ---
 
-## ⭐ 评价维度体系（第二个环节输出）
+## ⭐ Evaluation Dimension System (Second Stage Output)
 
 ${dimensionsContent}
 
 ---
 
-## � 使用说明
+## 📖 Usage Instructions
 
-**任务ID**: ${taskId}  
-**生成时间**: ${new Date().toLocaleString('zh-CN')}
+**Task ID**: ${taskId}  
+**Generation Time**: ${new Date().toLocaleString('en-US')}
 
-**评分方式**: 每个维度可给0-10分任意数字（包括小数点）  
-**参考标准**: 6分及格、8分优秀、10分卓越  
-**最终分数**: 所有维度得分的平均值
+**Scoring Method**: Each dimension can be scored 0-10 with any number (including decimals)  
+**Reference Standards**: 6 points passing, 8 points excellent, 10 points outstanding  
+**Final Score**: Average of all dimension scores
 
-**状态**: ✅ 任务提炼和评价标准已完成，可开始执行任务
+**Status**: ✅ Task refinement and evaluation standards completed, ready to start task execution
 
 ---
 
-*Quality Dimension Generator - 双环节输出完整版*
+*Quality Dimension Generator - Complete Two-Stage Output*
 `;
 			
-			// 写入最终文件
+			// Write final file
 			await fs.writeFile(dimensionPath, finalContent, { encoding: 'utf-8' });
 			
-			// 验证文件写入成功并读取确认
+			// Verify file write succeeded and read confirmation
 			const fileStats = await fs.stat(dimensionPath);
 			
 			if (fileStats.size === 0) {
-				throw new Error('文件写入失败：文件大小为0');
+				throw new Error('File write failed: file size is 0');
 			}
 			
-			console.log(`✅ 最终评价标准已保存: ${dimensionPath} (${fileStats.size} 字节)`);
+			console.log(`✅ Final evaluation standards saved: ${dimensionPath} (${fileStats.size} bytes)`);
 			return dimensionPath;
 			
 		} catch (error) {
-			console.error('保存最终评价标准失败:', error);
-			throw new Error(`保存最终评价标准失败: ${error instanceof Error ? error.message : String(error)}`);
+			console.error('Failed to save final evaluation standards:', error);
+			throw new Error(`Failed to save final evaluation standards: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 }
