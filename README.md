@@ -20,8 +20,9 @@ Quality Dimension Generator analyzes your tasks and automatically creates profes
 ## 🌟 Key Features
 
 ### Core Capabilities
-- **Intelligent Task Analysis** - Extract and refine core tasks from conversations
+- **Intelligent Task Analysis** - Extract and refine core tasks from conversations with LLM-generated semantic naming
 - **Dynamic Dimension Generation** - Create custom evaluation frameworks
+- **Flat File Architecture** - Streamlined storage with `taskId_TaskName.md` naming for easy organization
 - **Dual-Output Workflow** - Separate task refinement and dimension generation
 - **Smart Deduplication** - Avoid duplicate work with content-based hashing
 - **Timezone Intelligence** - Automatic detection and localization
@@ -41,52 +42,16 @@ Quality Dimension Generator analyzes your tasks and automatically creates profes
 
 ### Installation
 
-#### Option 1: NPM Package (Recommended)
-```bash
-npm install -g quality-dimension-generator
-```
+Install from the **Smithery AI Model Context Protocol Registry**:
 
-#### Option 2: From Source
-```bash
-git clone <repository-url>
-cd quality-dimension-generator
-npm install
-npm run build
-```
+🔗 **[Get Quality Dimension Generator on Smithery](https://smithery.ai/server/@magenie33/quality-dimension-generator)**
+
+The server will be automatically configured and ready to use with your MCP-compatible client.
 
 ### Configuration
 
-#### MCP Client Setup
-
-Add to your MCP configuration file:
-
-**Claude Desktop** (`claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "quality-dimension-generator": {
-      "command": "quality-dimension-generator",
-      "args": [],
-      "env": {
-        "PROJECT_PATH": "/path/to/your/projects"
-      }
-    }
-  }
-}
-```
-
-**VS Code** (`settings.json`):
-```json
-{
-  "mcp.servers": {
-    "quality-dimension-generator": {
-      "command": "quality-dimension-generator",
-      "args": [],
-      "cwd": "/path/to/your/project"
-    }
-  }
-}
-```
+#### Automatic Setup
+Once installed from Smithery, the server is automatically configured in your MCP client. No manual configuration required!
 
 #### Project Configuration
 
@@ -95,10 +60,11 @@ The tool automatically creates a `.qdg` directory in your project:
 ```
 .qdg/
 ├── config/
-│   └── qdg.config.json     # Configuration settings
+│   └── qdg.config.json           # Configuration settings
 └── tasks/
-    └── task_[timestamp]_[hash]/
-        └── task_[id]_output.md  # Generated evaluation standards
+    ├── task_[id]_[TaskName].md   # Quality evaluation standards (flat files)
+    ├── task_[id]_[AnotherTask].md
+    └── task_[id]_[ThirdTask].md
 ```
 
 Configure dimensions and scoring in `.qdg/config/qdg.config.json`:
@@ -290,8 +256,9 @@ Use the built-in diagnostic tool to check your environment:
 We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
 
 ### Development Setup
+For contributors working on the source code:
 ```bash
-git clone <repository-url>
+git clone https://github.com/magenie33/quality-dimension-generator
 cd quality-dimension-generator
 npm install
 npm run dev

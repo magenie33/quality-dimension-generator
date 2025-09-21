@@ -25,6 +25,7 @@ Please analyze according to the following dimensions and output the result in JS
 \`\`\`json
 {
   "coreTask": "Description of the user's core task",
+  "taskName": "Concise task name (suitable for file naming, can be in Chinese or English)",
   "taskType": "Task type (e.g., development, design, analysis, learning, management, consulting, etc.)",
   "complexity": Complexity level (1-5),
   "domain": "Task domain (e.g., technical development, business management, education and training, etc.)",
@@ -35,7 +36,8 @@ Please analyze according to the following dimensions and output the result in JS
 
 Analysis Requirements:
 1. Core Task: Extract the user's main needs and expected goals
-2. Task Type: Classify according to the nature of the task
+2. Task Name: Generate a concise name of 3-15 characters, suitable for file naming, avoid special symbols
+3. Task Type: Classify according to the nature of the task
 3. Complexity: 1=Simple 2=Fairly Simple 3=Medium 4=Fairly Complex 5=Complex
 4. Domain: Identify the professional domain to which the task belongs
 5. Key Elements: Identify important constraints, technical requirements, standard requirements, etc.
@@ -57,12 +59,13 @@ Please ensure the analysis is accurate, specific, and practical.`;
 		const result = JSON.parse(jsonMatch[1]);
 		
 		// Validate required fields
-		if (!result.coreTask || !result.taskType || !result.domain) {
+		if (!result.coreTask || !result.taskType || !result.domain || !result.taskName) {
 			throw new Error('Analysis result missing required fields');
 		}
 
 		return {
 			coreTask: result.coreTask,
+			taskName: result.taskName,
 			taskType: result.taskType,
 			complexity: result.complexity || 3,
 			domain: result.domain,

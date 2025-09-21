@@ -5,12 +5,12 @@ import { join, resolve } from 'path';
  * QDG (Quality Dimension Generator) Directory Manager
  * Responsible for creating and managing .qdg folder structure in project root
  * 
- * New directory structure (focused on dimension generation):
+ * New directory structure (flat file system):
  * .qdg/
  * ├── config/          - Global configuration files
- * └── tasks/           - Task records (sorted by timestamp)
- *     └── task_xxx/    - Individual task folder
- *         └── task_xxx_dimension.md  - Quality dimensions (readable format)
+ * └── tasks/           - Task records (flat files with semantic names)
+ *     ├── task_xxx_TaskName.md  - Individual task files
+ *     └── task_yyy_AnotherTask.md
  */
 export class QdgDirectoryManager {
 	private readonly QDG_DIR_NAME = '.qdg';
@@ -105,7 +105,27 @@ export class QdgDirectoryManager {
 	}
 	
 	/**
-	 * Get task folder path
+	 * Sanitize task name for safe file naming
+	 */
+	private sanitizeTaskName(taskName: string): string {
+		return taskName
+			.replace(/[<>:"/\\|?*]/g, '') // Remove illegal file characters
+			.replace(/\s+/g, '_') // Replace spaces with underscores
+			.replace(/[^\w\u4e00-\u9fa5_-]/g, '') // Keep only word characters, Chinese characters, underscores, and hyphens
+			.substring(0, 50); // Limit length to 50 characters
+	}
+
+	/**
+	 * Get task file path (flat structure)
+	 */
+	getTaskFilePath(projectPath: string, taskId: string, taskName: string): string {
+		const dirs = this.getSubDirectories(projectPath);
+		const sanitizedTaskName = this.sanitizeTaskName(taskName);
+		return join(dirs.tasks, `${taskId}_${sanitizedTaskName}.md`);
+	}
+
+	/**
+	 * Get task folder path (deprecated - kept for backward compatibility)
 	 */
 	getTaskDirectory(projectPath: string, taskId: string): string {
 		const dirs = this.getSubDirectories(projectPath);
@@ -368,7 +388,96 @@ ${dimensionsContent}`;
 	}
 
 	/**
-	 * Save final evaluation dimension standards (dedicated for save_quality_dimensions tool)
+	 * Save final evaluation dimension standards (flat file structure with LLM-generated task name)
+	 */
+	async saveFinalDimensionStandardsFlat(
+		projectPath: string, 
+		taskId: string, 
+		taskName: string,
+		task: any, 
+		refinedTaskDescription: string, 
+		dimensionsContent: string
+	): Promise<string> {
+		try {
+			const dirs = this.getSubDirectories(projectPath);
+			const taskFilePath = this.getTaskFilePath(projectPath, taskId, taskName);
+			
+			// Ensure tasks directory exists
+			await fs.mkdir(dirs.tasks, { recursive: true });
+			
+			// Verify directory creation succeeded
+			const dirStats = await fs.stat(dirs.tasks);
+			if (!dirStats.isDirectory()) {
+				throw new Error(`Tasks directory creation failed: ${dirs.tasks}`);
+			}
+			
+			// Generate final evaluation standards document (containing two LLM outputs)
+			const finalContent = `# Quality Evaluation Standards
+
+## 📋 Task Information
+- **Task ID**: ${taskId}
+- **Task Name**: ${taskName}
+- **Creation Time**: ${new Date().toLocaleString('en-US')}
+- **Core Task**: ${task.coreTask || 'Not specified'}
+- **Task Type**: ${task.taskType || 'Not specified'}
+- **Complexity**: ${task.complexity || 'N/A'}/5
+- **Domain**: ${task.domain || 'Not specified'}
+
+## 🎯 Task Objectives
+${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : 'None'}
+
+## 🔑 Key Elements
+${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : 'None'}
+
+---
+
+## 📋 Task Refinement (First Stage Output)
+
+${refinedTaskDescription}
+
+---
+
+## ⭐ Evaluation Dimension System (Second Stage Output)
+
+${dimensionsContent}
+
+---
+
+## 📖 Usage Instructions
+
+**Scoring Method**: Each dimension can be scored 0-10 with any number (including decimals)  
+**Reference Standards**: 6 points passing, 8 points excellent, 10 points outstanding  
+**Final Score**: Average of all dimension scores
+
+**Status**: ✅ Task refinement and evaluation standards completed, ready to start task execution
+
+---
+
+*Quality Dimension Generator - Complete Two-Stage Output*
+*Generated at: ${new Date().toISOString()}*
+`;
+			
+			// Write final file
+			await fs.writeFile(taskFilePath, finalContent, { encoding: 'utf-8' });
+			
+			// Verify file write succeeded and read confirmation
+			const fileStats = await fs.stat(taskFilePath);
+			
+			if (fileStats.size === 0) {
+				throw new Error('File write failed: file size is 0');
+			}
+			
+			console.log(`✅ Final evaluation standards saved: ${taskFilePath} (${fileStats.size} bytes)`);
+			return taskFilePath;
+			
+		} catch (error) {
+			console.error('Failed to save final evaluation standards:', error);
+			throw new Error(`Failed to save final evaluation standards: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	/**
+	 * Save final evaluation dimension standards (deprecated - kept for backward compatibility)
 	 */
 	async saveFinalDimensionStandards(projectPath: string, taskId: string, task: any, refinedTaskDescription: string, dimensionsContent: string): Promise<string> {
 		try {

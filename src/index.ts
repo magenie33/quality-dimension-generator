@@ -397,10 +397,15 @@ ${prompt}
 						}
 					}
 					
-					// Save clean single-file output: pure task description and evaluation dimensions
-					const outputFilePath = await qdgManager.saveCleanOutput(
+					// Extract task name from task analysis or use fallback
+					const taskName = task.taskName || 'UnnamedTask';
+					
+					// Save using new flat file structure with LLM-generated task name
+					const outputFilePath = await qdgManager.saveFinalDimensionStandardsFlat(
 						projectPath, 
-						taskId, 
+						taskId,
+						taskName,
+						task,
 						refinedTaskDescription,
 						dimensionsContent
 					);
@@ -408,7 +413,7 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: `✅ Quality evaluation standards saved successfully!\n\n🎯 Task ID: ${taskId}\n📁 Saved file: ${path.relative(projectPath, outputFilePath)}\n📋 Status: Pure task description and evaluation standards saved\n\n🚀 Now you can start executing the task and evaluate according to the saved standards after completion!`
+							text: `✅ Quality evaluation standards saved successfully!\n\n🎯 Task ID: ${taskId}\n📝 Task Name: ${taskName}\n📁 Saved file: ${path.relative(projectPath, outputFilePath)}\n📋 Status: Task description and evaluation standards saved in flat file structure\n\n🚀 Now you can start executing the task and evaluate according to the saved standards after completion!`
 						}]
 					};
 				} catch (error) {
