@@ -1,7 +1,7 @@
 {
 	"name": "quality-dimension-generator",
 	"version": "1.0.0",
-	"description": "MCP server for generating quality evaluation dimensions - 专注于为任务生成明确的质量评价标准",
+	"description": "MCP server for generating quality evaluation dimensions and assessment criteria",
 	"type": "module",
 	"module": "src/index.ts",
 	"main": "dist/index.js",
@@ -42,8 +42,7 @@
 		"llm",
 		"ai",
 		"claude",
-		"productivity",
-		"chinese-support"
+		"productivity"
 	],
 	"author": "magenie33",
 	"license": "MIT",

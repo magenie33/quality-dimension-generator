@@ -2,29 +2,28 @@ import { promises as fs } from 'fs';
 import { join, resolve } from 'path';
 
 /**
- * QDG (Quality Dimension Generator) 目录管理器
- * 负责在项目根		// 创建README.md
-		const readmePath = join(dirs.qdgDir, 'README.md');创建和管理 .qdg 文件夹结构
+ * QDG (Quality Dimension Generator) Directory Manager
+ * Responsible for creating and managing .qdg folder structure in project root
  * 
- * 新的目录结构（专注于维度生成）：
+ * New directory structure (focused on dimension generation):
  * .qdg/
- * ├── config/          - 全局配置文件
- * └── tasks/           - 任务记录（按时间戳排序）
- *     └── task_xxx/    - 单个任务文件夹
- *         └── task_xxx_dimension.md  - 质量维度（易读格式）
+ * ├── config/          - Global configuration files
+ * └── tasks/           - Task records (sorted by timestamp)
+ *     └── task_xxx/    - Individual task folder
+ *         └── task_xxx_dimension.md  - Quality dimensions (readable format)
  */
 export class QdgDirectoryManager {
 	private readonly QDG_DIR_NAME = '.qdg';
 	
 	/**
-	 * 获取项目根目录中的 .qdg 目录路径
+	 * Get .qdg directory path in project root
 	 */
 	getQdgDirectory(projectPath: string): string {
 		return join(resolve(projectPath), this.QDG_DIR_NAME);
 	}
 	
 	/**
-	 * 获取各个子目录的路径
+	 * Get paths for subdirectories
 	 */
 	getSubDirectories(projectPath: string) {
 		const qdgDir = this.getQdgDirectory(projectPath);
@@ -36,8 +35,8 @@ export class QdgDirectoryManager {
 	}
 	
 	/**
-	 * 初始化 .qdg 目录结构
-	 * 创建必要的子目录和配置文件
+	 * Initialize .qdg directory structure
+	 * Create necessary subdirectories and configuration files
 	 */
 	async initializeQdgDirectory(projectPath: string): Promise<{
 		qdgDir: string;
@@ -48,16 +47,16 @@ export class QdgDirectoryManager {
 		const created: string[] = [];
 		const existed: string[] = [];
 		
-		// 创建所有必要的目录
+		// Create all necessary directories
 		for (const [name, dirPath] of Object.entries(dirs)) {
 			try {
 				await fs.mkdir(dirPath, { recursive: true });
 				
-				// 检查目录是否是新创建的
+				// Check if directory is newly created
 				try {
 					const stats = await fs.stat(dirPath);
 					if (stats.isDirectory()) {
-						// 检查目录是否为空来判断是否是新创建的
+						// Check if directory is empty to determine if newly created
 						const files = await fs.readdir(dirPath);
 						if (files.length === 0 && name !== 'qetDir') {
 							created.push(name);
@@ -69,11 +68,11 @@ export class QdgDirectoryManager {
 					created.push(name);
 				}
 			} catch (error) {
-				console.warn(`创建目录 ${name} 失败:`, error);
+				console.warn(`Failed to create directory ${name}:`, error);
 			}
 		}
 		
-		// 创建配置文件
+		// Create configuration files
 		await this.createConfigFiles(dirs);
 		
 		return {
@@ -84,20 +83,20 @@ export class QdgDirectoryManager {
 	}
 	
 	/**
-	 * 创建默认配置文件
+	 * Create default configuration files
 	 */
 	private async createConfigFiles(dirs: ReturnType<typeof this.getSubDirectories>): Promise<void> {
-		// 创建主配置文件
+		// Create main configuration file
 		const mainConfigPath = join(dirs.config, 'qdg.config.json');
 		try {
 			await fs.access(mainConfigPath);
-			// 文件已存在，不覆盖
+			// File already exists, do not overwrite
 		} catch {
-			// 文件不存在，创建默认配置（只包含设置项）
+			// File does not exist, create default configuration (settings only)
 			const defaultConfig = {
 				settings: {
-					dimensionCount: 5,    // 默认5个维度
-					expectedScore: 8      // 默认期望8分
+					dimensionCount: 5,    // Default 5 dimensions
+					expectedScore: 8      // Default expected score 8
 				}
 			};
 			
@@ -106,7 +105,7 @@ export class QdgDirectoryManager {
 	}
 	
 	/**
-	 * 获取任务文件夹路径
+	 * Get task folder path
 	 */
 	getTaskDirectory(projectPath: string, taskId: string): string {
 		const dirs = this.getSubDirectories(projectPath);
@@ -114,112 +113,112 @@ export class QdgDirectoryManager {
 	}
 	
 	/**
-	 * 获取快照存储路径
+	 * Get snapshot storage path
 	 */
 	getSnapshotPath(projectPath: string, taskId: string): string {
 		return join(this.getTaskDirectory(projectPath, taskId), `${taskId}_snapshot.json`);
 	}
 	
 	/**
-	 * 获取评价结果存储路径
+	 * Get evaluation result storage path
 	 */
 	getEvaluationPath(projectPath: string, taskId: string): string {
 		return join(this.getTaskDirectory(projectPath, taskId), `${taskId}_evaluation.json`);
 	}
 	
 	/**
-	 * 获取维度定义存储路径
+	 * Get dimension definition storage path
 	 */
 	getDimensionPath(projectPath: string, taskId: string): string {
 		return join(this.getTaskDirectory(projectPath, taskId), `${taskId}_dimension.md`);
 	}
 	/**
-	 * 保存LLM生成的评价维度标准（增强版）
+	 * Save LLM-generated evaluation dimension standards (enhanced version)
 	 */
 	async saveDimensionStandards(projectPath: string, taskId: string, task: any, generatedDimensions: string): Promise<string> {
 		try {
 			const taskDir = this.getTaskDirectory(projectPath, taskId);
 			const dimensionPath = this.getDimensionPath(projectPath, taskId);
 			
-			// 确保任务目录存在，多重检查
+			// Ensure task directory exists with multiple checks
 			await fs.mkdir(taskDir, { recursive: true });
 			
-			// 验证目录确实创建成功
+			// Verify directory creation succeeded
 			const dirStats = await fs.stat(taskDir);
 			if (!dirStats.isDirectory()) {
-				throw new Error(`任务目录创建失败: ${taskDir}`);
+				throw new Error(`Task directory creation failed: ${taskDir}`);
 			}
 			
-			// 生成完整的评价标准文档
-			const standardsContent = `# 质量评价标准
+			// Generate complete evaluation standards document
+			const standardsContent = `# Quality Evaluation Standards
 
-## 📋 任务信息
-- **任务ID**: ${taskId}
-- **创建时间**: ${new Date().toLocaleString('zh-CN')}
-- **核心任务**: ${task.coreTask || '未指定'}
-- **任务类型**: ${task.taskType || '未指定'}
-- **复杂度**: ${task.complexity || 'N/A'}/5
-- **领域**: ${task.domain || '未指定'}
+## 📋 Task Information
+- **Task ID**: ${taskId}
+- **Creation Time**: ${new Date().toLocaleString('en-US')}
+- **Core Task**: ${task.coreTask || 'Not specified'}
+- **Task Type**: ${task.taskType || 'Not specified'}
+- **Complexity**: ${task.complexity || 'N/A'}/5
+- **Domain**: ${task.domain || 'Not specified'}
 
-## 🎯 任务目标
-${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : '无'}
+## 🎯 Task Objectives
+${task.objectives ? task.objectives.map((obj: any) => `- ${obj}`).join('\n') : 'None'}
 
-## 🔑 关键要素
-${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : '无'}
+## 🔑 Key Elements
+${task.keyElements ? task.keyElements.map((elem: any) => `- ${elem}`).join('\n') : 'None'}
 
 ---
 
-## ⭐ 评价维度标准
+## ⭐ Evaluation Dimension Standards
 
 ${generatedDimensions}
 
 ---
 
-## 📊 使用说明
+## 📊 Usage Instructions
 
-### 评分方式
-- **分数范围**: 每个维度可给0-10分任意数字（包括小数点）
-- **参考标准**: 6分及格、8分优秀、10分卓越
-- **最终分数**: 所有维度得分的平均值
-- **评分要求**: 请根据实际完成情况严格按照上述标准评分
+### Scoring Method
+- **Score Range**: Each dimension can be scored 0-10 with any number (including decimals)
+- **Reference Standards**: 6 points passing, 8 points excellent, 10 points outstanding
+- **Final Score**: Average of all dimension scores
+- **Scoring Requirements**: Please score strictly according to the above standards based on actual completion
 
-### 文档信息
-- **生成时间**: ${new Date().toISOString()}
-- **文档类型**: QDG质量评价标准（完整版本）
-- **任务ID**: ${taskId}
-- **状态**: ✅ 已完成标准制定，可开始任务执行
+### Document Information
+- **Generation Time**: ${new Date().toISOString()}
+- **Document Type**: QDG Quality Evaluation Standards (Complete Version)
+- **Task ID**: ${taskId}
+- **Status**: ✅ Standards completed, ready to start task execution
 
 ---
 
-*本文档由 Quality Dimension Generator 自动生成和保存*
+*This document is automatically generated and saved by Quality Dimension Generator*
 `;
 			
-			// 写入文件，确保编码正确
+			// Write file with correct encoding
 			await fs.writeFile(dimensionPath, standardsContent, { encoding: 'utf-8' });
 			
-			// 验证文件确实写入成功
+			// Verify file write succeeded
 			const fileStats = await fs.stat(dimensionPath);
 			if (fileStats.size === 0) {
-				throw new Error('文件写入失败：文件大小为0');
+				throw new Error('File write failed: file size is 0');
 			}
 			
-			// 验证文件内容
+			// Verify file content
 			const savedContent = await fs.readFile(dimensionPath, 'utf-8');
 			if (!savedContent.includes(taskId) || !savedContent.includes(generatedDimensions)) {
-				throw new Error('文件内容验证失败：保存的内容不完整');
+				throw new Error('File content verification failed: saved content incomplete');
 			}
 			
-			console.log(`✅ 评价标准已成功保存: ${dimensionPath} (${fileStats.size} bytes)`);
+			console.log(`✅ Evaluation standards successfully saved: ${dimensionPath} (${fileStats.size} bytes)`);
 			return dimensionPath;
 			
 		} catch (error) {
-			console.error('❌ 保存评价标准失败:', error);
-			throw new Error(`保存评价标准失败: ${error instanceof Error ? error.message : String(error)}`);
+			console.error('❌ Failed to save evaluation standards:', error);
+			throw new Error(`Failed to save evaluation standards: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 
 	/**
-	 * 读取已保存的评价标准
+	 * Read saved evaluation standards
 	 */
 	async readDimensionStandards(projectPath: string, taskId: string): Promise<string | null> {
 		try {
@@ -243,7 +242,7 @@ ${generatedDimensions}
 	}
 	
 	/**
-	 * 获取 QDG 配置
+	 * Get QDG configuration
 	 */
 	async getQdgConfig(projectPath: string): Promise<any> {
 		const dirs = this.getSubDirectories(projectPath);
@@ -253,18 +252,18 @@ ${generatedDimensions}
 			const content = await fs.readFile(configPath, 'utf-8');
 			return JSON.parse(content);
 		} catch {
-			// 返回默认配置（只包含设置项）
+			// Return default configuration (settings only)
 			return {
 				settings: {
-					dimensionCount: 5,    // 默认5个维度
-					expectedScore: 8      // 默认期望8分
+					dimensionCount: 5,    // Default 5 dimensions
+					expectedScore: 8      // Default expected score 8
 				}
 			};
 		}
 	}
 
 	/**
-	 * 保存简洁的单文件输出：纯净的任务描述和评价维度
+	 * Save clean single-file output: pure task description and evaluation dimensions
 	 */
 	async saveCleanOutput(
 		projectPath: string, 
@@ -275,47 +274,47 @@ ${generatedDimensions}
 		try {
 			const taskDir = this.getTaskDirectory(projectPath, taskId);
 			
-			// 确保任务目录存在
+			// Ensure task directory exists
 			await fs.mkdir(taskDir, { recursive: true });
 			
-			// 定义输出文件路径
+			// Define output file path
 			const outputFilePath = join(taskDir, `${taskId}_output.md`);
 			
-			// 创建简洁的文件内容：只包含纯净的两个输出
-			const cleanContent = `# 任务描述
+			// Create clean file content: containing only pure two outputs
+			const cleanContent = `# Task Description
 
 ${refinedTaskDescription}
 
 ---
 
-# 评价维度
+# Evaluation Dimensions
 
 ${dimensionsContent}`;
 			
-			// 写入文件
+			// Write file
 			await fs.writeFile(outputFilePath, cleanContent, { encoding: 'utf-8' });
 			
-			// 验证文件创建成功
+			// Verify file creation succeeded
 			const fileStats = await fs.stat(outputFilePath);
 			
 			if (fileStats.size === 0) {
-				throw new Error('文件写入失败：文件大小为0');
+				throw new Error('File write failed: file size is 0');
 			}
 			
-			console.log(`✅ 简洁输出已保存: ${outputFilePath} (${fileStats.size} 字节)`);
+			console.log(`✅ Clean output saved: ${outputFilePath} (${fileStats.size} bytes)`);
 			
 			return outputFilePath;
 			
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error('❌ 保存简洁输出失败:', errorMessage);
-			throw new Error(`保存简洁输出失败: ${errorMessage}`);
+			console.error('❌ Failed to save clean output:', errorMessage);
+			throw new Error(`Failed to save clean output: ${errorMessage}`);
 		}
 	}
 
 	/**
-	 * 保存双文件输出：任务描述和评价维度的纯净版本
-	 * 返回两个独立的md文件路径
+	 * Save dual-file output: pure versions of task description and evaluation dimensions
+	 * Returns two independent md file paths
 	 */
 	async saveDualOutputFiles(
 		projectPath: string, 
@@ -382,10 +381,10 @@ ${dimensionsContent}`;
 			// 验证目录创建成功
 			const dirStats = await fs.stat(taskDir);
 			if (!dirStats.isDirectory()) {
-				throw new Error(`任务目录创建失败: ${taskDir}`);
+				throw new Error(`Task directory creation failed: ${taskDir}`);
 			}
 			
-			// 生成最终的评价标准文档（包含两个LLM输出）
+			// Generate final evaluation standards document (containing two LLM outputs)
 			const finalContent = `# 质量评价标准
 
 ## 📋 任务提炼（第一个环节输出）

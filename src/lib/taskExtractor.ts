@@ -1,14 +1,14 @@
 import { TaskAnalysis, ConversationInput } from './types.js';
 
 /**
- * 任务提炼器类 - 纯prompt方式
- * 只生成让LLM分析任务的提示词，不做任何主观判断
+ * Task Extractor Class - Pure prompt approach
+ * Only generates prompts for LLM to analyze tasks, makes no subjective judgments
  */
 export class TaskExtractor {
 	
 	/**
-	 * 生成任务分析提示词
-	 * 让LLM自己分析任务并输出结构化结果
+	 * Generate task analysis prompt
+	 * Let LLM analyze tasks and output structured results
 	 */
 	public generateTaskAnalysisPrompt(input: ConversationInput): string {
 		const { userMessage, conversationHistory = [] } = input;

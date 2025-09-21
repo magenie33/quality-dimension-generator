@@ -1,41 +1,45 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
- * MCP Quality Dimension Generator - 工具Schema定义
- * 用于LLM理解和调用质量评价工具的标准接口
+ * MCP Quality Dimension Generator - Tool Schema Definitions
+ * Standard interface for LLMs t	TASK_ANALYSIS_PROMPT_TOOL,         // Step 1: Analyze task
+	QUALITY_DIMENSIONS_PROMPT_TOOL,    // Step 2: Generate prompts
+	SAVE_QUALITY_DIMENSIONS_TOOL,      // Step 3: Save LLM output
+	TIME_CONTEXT_TOOL,                 // Helper: Time context
+	DIAGNOSE_WORKING_DIRECTORY_TOOL    // Helper: Directory diagnosiserstand and call quality evaluation tools
  */
 
 /**
- * 任务分析提示词生成工具
+ * Task analysis prompt generation tool
  */
 export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 	name: 'generate_task_analysis_prompt',
-	description: '生成任务分析提示词，让LLM分析用户对话中的核心任务',
+	description: 'Generate task analysis prompt to help LLM analyze core tasks in user conversations',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			userMessage: {
 				type: 'string',
-				description: '用户消息内容'
+				description: 'User message content'
 			},
 			conversationHistory: {
 				type: 'array',
-				description: '对话历史记录（可选）',
+				description: 'Conversation history (optional)',
 				items: {
 					type: 'object',
 					properties: {
 						role: {
 							type: 'string',
 							enum: ['user', 'assistant'],
-							description: '消息角色'
+							description: 'Message role'
 						},
 						content: {
 							type: 'string',
-							description: '消息内容'
+							description: 'Message content'
 						},
 						timestamp: {
 							type: 'number',
-							description: '消息时间戳（可选）'
+							description: 'Message timestamp (optional)'
 						}
 					},
 					required: ['role', 'content']
@@ -43,7 +47,7 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 			},
 			context: {
 				type: 'object',
-				description: '额外上下文信息（可选）',
+				description: 'Additional context information (optional)',
 				additionalProperties: true
 			}
 		},
@@ -52,35 +56,35 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 };
 
 /**
- * 质量维度提示词生成工具
+ * Quality dimension prompt generator tool
  */
 export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 	name: 'generate_quality_dimensions_prompt',
-	description: '生成质量维度提示词并创建任务记录，让LLM根据任务生成专业评价维度',
+	description: 'Generate quality dimension prompts and create task records, allowing LLMs to generate professional evaluation dimensions based on tasks',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			taskAnalysisJson: {
 				type: 'string',
-				description: '任务分析的JSON结果'
+				description: 'Task analysis JSON result'
 			},
 			targetScore: {
 				type: 'number',
-				description: '目标分数（0-10分制，用于指导评价标准的严格程度）',
+				description: 'Target score (0-10 scale, used to guide evaluation criteria strictness)',
 				default: 8
 			},
 			timezone: {
 				type: 'string',
-				description: '时区（可选）'
+				description: 'Timezone (optional)'
 			},
 			locale: {
 				type: 'string',
-				description: '本地化设置',
+				description: 'Localization settings',
 				default: 'zh-CN'
 			},
 			projectPath: {
 				type: 'string',
-				description: '项目路径（可选，用于保存任务记录）'
+				description: 'Project path (optional, used to save task records)'
 			}
 		},
 		required: ['taskAnalysisJson']
@@ -88,33 +92,33 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 };
 
 /**
- * 质量维度保存工具 - 保存LLM的双输出结果
+ * Quality dimension save tool - Save LLM dual-output results
  */
 export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 	name: 'save_quality_dimensions',
-	description: '保存LLM生成的任务提炼和评价维度标准到.qdg目录',
+	description: 'Save LLM-generated task refinement and evaluation dimension standards to .qdg directory',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			taskId: {
 				type: 'string',
-				description: '任务ID'
+				description: 'Task ID'
 			},
 			projectPath: {
 				type: 'string',
-				description: '项目路径'
+				description: 'Project path'
 			},
 			refinedTaskDescription: {
 				type: 'string',
-				description: 'LLM提炼后的任务描述（第一个环节的output）'
+				description: 'LLM-refined task description (first stage output)'
 			},
 			dimensionsContent: {
 				type: 'string',
-				description: 'LLM生成的完整评价维度内容（第二个环节的output）'
+				description: 'LLM-generated complete evaluation dimension content (second stage output)'
 			},
 			taskAnalysisJson: {
 				type: 'string',
-				description: '原始任务分析JSON（可选，用于基础信息）'
+				description: 'Original task analysis JSON (optional, for basic information)'
 			}
 		},
 		required: ['taskId', 'projectPath', 'refinedTaskDescription', 'dimensionsContent']
@@ -122,21 +126,21 @@ export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 };
 
 /**
- * 时间上下文工具
+ * Time context tool
  */
 export const TIME_CONTEXT_TOOL: Tool = {
 	name: 'get_current_time_context',
-	description: '获取当前基本的时间上下文信息（自动检测系统时区）',
+	description: 'Get current basic time context information (auto-detect system timezone)',
 	inputSchema: {
 		type: 'object',
 		properties: {
 			timezone: {
 				type: 'string',
-				description: '时区（可选，不指定则自动检测系统时区）'
+				description: 'Timezone (optional, auto-detect system timezone if not specified)'
 			},
 			locale: {
 				type: 'string',
-				description: '本地化设置',
+				description: 'Localization settings',
 				default: 'zh-CN'
 			}
 		}
@@ -144,11 +148,11 @@ export const TIME_CONTEXT_TOOL: Tool = {
 };
 
 /**
- * 诊断工作目录工具
+ * Working directory diagnosis tool
  */
 export const DIAGNOSE_WORKING_DIRECTORY_TOOL: Tool = {
 	name: 'diagnose_working_directory',
-	description: '诊断当前工作目录和MCP服务器运行环境，帮助解决路径相关问题',
+	description: 'Diagnose current working directory and MCP server runtime environment, help resolve path-related issues',
 	inputSchema: {
 		type: 'object',
 		properties: {}
@@ -156,18 +160,18 @@ export const DIAGNOSE_WORKING_DIRECTORY_TOOL: Tool = {
 };
 
 /**
- * 工具导出 - 按使用频率排序
+ * Tool exports - ordered by usage frequency
  */
 export const ALL_TOOLS = [
-	TASK_ANALYSIS_PROMPT_TOOL,         // 第1步：分析任务
-	QUALITY_DIMENSIONS_PROMPT_TOOL,    // 第2步：生成提示词
-	SAVE_QUALITY_DIMENSIONS_TOOL,      // 第3步：保存LLM输出
-	TIME_CONTEXT_TOOL,                 // 辅助：时间上下文
-	DIAGNOSE_WORKING_DIRECTORY_TOOL    // 辅助：诊断工具
+	TASK_ANALYSIS_PROMPT_TOOL,         // Step 1: Analyze task
+	QUALITY_DIMENSIONS_PROMPT_TOOL,    // Step 2: Generate prompts
+	SAVE_QUALITY_DIMENSIONS_TOOL,      // Step 3: Save LLM output
+	TIME_CONTEXT_TOOL,                 // Helper: Time context
+	DIAGNOSE_WORKING_DIRECTORY_TOOL    // Helper: Directory diagnosis
 ] as const;
 
 /**
- * 核心工作流程工具（推荐使用顺序）
+ * Core workflow tools (recommended usage order)
  */
 export const CORE_WORKFLOW_TOOLS = [
 	TASK_ANALYSIS_PROMPT_TOOL,

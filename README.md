@@ -1,87 +1,321 @@
 # Quality Dimension Generator MCP Server
 
-一个基于 Model Context Protocol (MCP) 的智能质量维度生成器，专注于为任务评价提供专业、可配置的质量评价维度。
+An intelligent quality dimension generator based on Model Context Protocol (MCP), focused on providing professional and configurable quality evaluation dimensions for task assessment.
 
-## 🎯 核心理念
+## 🎯 Core Philosophy
 
-**双环节输出，职责分离**
-- ✅ **任务提炼** - LLM智能提炼和优化任务描述
-- ✅ **维度生成** - LLM生成专业的评价维度标准  
-- ✅ **双输出保存** - 分别保存任务提炼和评价标准
-- ✅ **6-8-10评分指导** - 6分及格、8分优秀、10分卓越的三层指导体系
-- ✅ **灵活评分范围** - 实际评分支持完整的0-10分制
-- ✅ **时区自动检测** - 智能检测系统时区，无需手动配置
-- ✅ **Markdown输出** - 人类友好的格式化输出
+**Dual-Output Workflow with Clear Separation of Concerns**
+- ✅ **Task Refinement** - LLM intelligently refines and optimizes task descriptions
+- ✅ **Dimension Generation** - LLM generates professional evaluation dimension standards  
+- ✅ **Dual Output Saving** - Separately saves task refinement and evaluation standards
+- ✅ **6-8-10 Scoring Guide** - Three-tier guidance system: 6 (pass), 8 (excellent), 10 (outstanding)
+- ✅ **Flexible Scoring Range** - Actual scoring supports full 0-10 scale
+- ✅ **Automatic Timezone Detection** - Intelligent system timezone detection, no manual configuration needed
+- ✅ **Markdown Output** - Human-friendly formatted output
 
-## 🌟 功能特性
+## 🌟 Features
 
-### 核心工作流程
-1. **任务分析** - 从用户对话中智能提取核心任务
-2. **提示词生成** - 生成专业的LLM提示词并创建任务记录
-3. **双输出处理** - LLM返回任务提炼+评价维度两个部分
-4. **结果保存** - 保存完整的任务和评价标准文档
+### Core Workflow
+1. **Task Analysis** - Intelligently extract core tasks from user conversations
+2. **Prompt Generation** - Generate professional LLM prompts and create task records
+3. **Dual Output Processing** - LLM returns both task refinement and evaluation dimensions
+4. **Result Saving** - Save complete task and evaluation standard documents
 
-### 配置特性
-- **维度数量** - 可配置1-10个维度（默认5个）
-- **期望分数** - 可配置0-10分期望分数（默认8分）
-- **智能去重** - 基于任务内容hash的智能去重
-- **目录管理** - 自动管理.qdg目录结构
+### Configuration Features
+- **Dimension Count** - Configurable 1-10 dimensions (default: 5)
+- **Expected Score** - Configurable 0-10 expected score (default: 8)
+- **Smart Deduplication** - Intelligent deduplication based on task content hash
+- **Directory Management** - Automatic .qdg directory structure management
 
-## 🛠 MCP 工具列表
+## 🛠 MCP Tools
 
 ### 1. generate_task_analysis_prompt
-分析用户对话中的核心任务
+Analyze core tasks from user conversations
 ```typescript
-输入：
-- userMessage: string - 用户消息内容  
-- conversationHistory?: array - 对话历史记录
-- context?: object - 额外上下文信息
+Input:
+- userMessage: string - User message content  
+- conversationHistory?: array - Conversation history
+- context?: object - Additional context information
 
-输出：结构化的任务分析提示词
+Output: Structured task analysis prompt
 ```
 
 ### 2. generate_quality_dimensions_prompt  
-生成质量维度提示词并创建任务记录
+Generate quality dimension prompts and create task records
 ```typescript
-输入：
-- taskAnalysisJson: string - 任务分析的JSON结果
-- targetScore?: number - 目标分数（默认8分）
-- timezone?: string - 时区
-- locale?: string - 本地化设置（默认zh-CN）
-- projectPath?: string - 项目路径（用于保存任务记录）
+Input:
+- taskAnalysisJson: string - Task analysis JSON result
+- targetScore?: number - Target score (default: 8)
+- timezone?: string - Timezone
+- locale?: string - Localization setting (default: en-US)
+- projectPath?: string - Project path (for saving task records)
 
-输出：格式化的提示词 + 任务ID + 使用说明
+Output: Professional LLM prompt for dimension generation
 ```
 
-### 3. save_quality_dimensions ⭐ 
-保存LLM生成的双输出结果
+### 3. save_quality_dimensions
+Save LLM-generated task refinement and evaluation dimensions
 ```typescript
-输入：
-- taskId: string - 任务ID
-- projectPath: string - 项目路径
-- refinedTaskDescription: string - LLM提炼的任务描述（第一环节输出）
-- dimensionsContent: string - LLM生成的评价维度（第二环节输出）
-- taskAnalysisJson?: string - 原始任务分析JSON（可选）
+Input:
+- taskId: string - Task ID
+- projectPath: string - Project path
+- refinedTaskDescription: string - LLM refined task description
+- dimensionsContent: string - LLM generated evaluation dimensions
+- taskAnalysisJson?: string - Original task analysis JSON
 
-输出：✅ 保存成功确认 + 文件路径
+Output: Clean formatted output file with task description and evaluation dimensions
 ```
 
 ### 4. get_current_time_context
-获取当前时间上下文（自动检测时区）
+Get current basic time context information
 ```typescript
-输入：
-- timezone?: string - 时区（可选，不指定则自动检测系统时区）
-- locale?: string - 本地化设置
+Input:
+- locale?: string - Localization setting (default: en-US)
+- timezone?: string - Timezone (auto-detected if not provided)
 
-输出：当前时间的客观信息，包含自动检测的时区
+Output: Current time context without subjective judgments
+```
+
+## 📁 Directory Structure
+
+The tool creates a `.qdg` directory in your project root:
+
+```
+.qdg/
+├── config/
+│   └── qdg.config.json     # Simplified configuration
+└── tasks/
+    └── task_[timestamp]_[hash]/
+        └── task_[id]_output.md  # Clean task description + evaluation dimensions
+```
+
+### Configuration File
+The `.qdg/config/qdg.config.json` contains minimal settings:
+```json
+{
+  "settings": {
+    "dimensionCount": 5,    # Number of evaluation dimensions (1-10)
+    "expectedScore": 8      # Expected score level (0-10)
+  }
+}
+```
+
+## 🚀 Usage Example
+
+### Complete Workflow
+
+1. **Extract Task from Conversation**
+```javascript
+// Call generate_task_analysis_prompt
+{
+  "userMessage": "I need to write a compelling product description for our new smartwatch",
+  "conversationHistory": [...],
+}
+```
+
+2. **Generate Quality Dimensions Prompt**
+```javascript
+// Call generate_quality_dimensions_prompt  
+{
+  "taskAnalysisJson": "{\"coreTask\": \"Write compelling smartwatch product description\", ...}",
+  "projectPath": "/path/to/project",
+  "targetScore": 8,
+  "locale": "en-US"
+}
+```
+
+3. **Process with LLM**
+Take the generated prompt, send it to your LLM, and get:
+- **Part 1**: Refined task description
+- **Part 2**: Professional evaluation dimensions
+
+4. **Save Results**
+```javascript
+// Call save_quality_dimensions
+{
+  "taskId": "task_1234567890_abc123",
+  "projectPath": "/path/to/project",
+  "refinedTaskDescription": "[LLM refined task description]",
+  "dimensionsContent": "[LLM generated evaluation dimensions]"
+}
+```
+
+### Example Output File
+The saved file contains clean, focused content:
+
+```markdown
+# Task Description
+
+## Core Task
+Write a compelling product description for our new smartwatch
+
+## Requirements
+- Target audience: Tech-savvy consumers aged 25-40
+- Length: 150-200 words
+- Highlight key features: health monitoring, battery life, design
+- Include emotional appeal and technical specifications
+
+---
+
+# Evaluation Dimensions
+
+## Evaluation Dimensions (5 dimensions, 10 points each)
+
+### 1. Content Accuracy (10 points)
+- 8-10 points: All technical specifications are accurate and verifiable
+- 6-7 points: Most information is accurate with minor discrepancies
+- 4-5 points: Some inaccuracies present
+- 0-3 points: Significant inaccuracies or misleading information
+
+### 2. Persuasive Appeal (10 points)
+- 8-10 points: Highly compelling, creates strong desire to purchase
+- 6-7 points: Moderately persuasive with good appeal
+- 4-5 points: Some persuasive elements present
+- 0-3 points: Weak or ineffective persuasive appeal
+
+[... additional dimensions ...]
+```
+
+## 🔧 Installation & Setup
+
+### Prerequisites
+- Node.js 18+ 
+- TypeScript
+- Model Context Protocol compatible client
+
+### Local Development
+```bash
+# Clone the repository
+git clone https://github.com/magenie33/quality-dimension-generator.git
+cd quality-dimension-generator
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Run locally with MCP Inspector
+npm run dev:legacy
+
+# Or run with Smithery CLI
+npm run dev
+```
+
+### Smithery.ai Deployment
+This server is optimized for deployment on [Smithery.ai](https://smithery.ai):
+
+1. Push your code to GitHub
+2. Connect your repository to Smithery
+3. Deploy with one click
+
+The server includes:
+- `smithery.yaml` configuration
+- Proper module exports for Smithery
+- Automatic timezone detection
+- Stateless design for cloud deployment
+
+## 🎨 Design Principles
+
+### Clean Output Focus
+- **Minimal Formatting**: Output files contain only essential content
+- **No Meta Information**: No timestamps, tool signatures, or usage instructions in final output
+- **Pure Content**: Just the refined task description and evaluation dimensions
+
+### Smart Task Management
+- **Content-Based Deduplication**: Same task content generates same task ID
+- **Hash-Based Identification**: Uses MD5 hash of core task elements
+- **Automatic Directory Creation**: Seamless .qdg directory management
+
+### Professional Standards
+- **Evidence-Based Evaluation**: Each dimension includes clear scoring criteria
+- **Flexible Scoring**: Supports decimal scores for precise evaluation
+- **Standardized Format**: Consistent output format across all tasks
+
+## 📊 Configuration Options
+
+### Tool-Level Configuration
+- `enabledTools`: Array of tools to enable
+- `debug`: Enable debug logging
+- `language`: Language preference (default: "en-US")
+
+### Project-Level Configuration  
+- `dimensionCount`: Number of evaluation dimensions (1-10)
+- `expectedScore`: Target score level for guidance (0-10)
+
+### Runtime Options
+- Automatic timezone detection
+- Configurable output localization
+- Project-specific settings
+
+## 🔍 Advanced Features
+
+### Intelligent Task Analysis
+- Extracts core tasks from conversational input
+- Identifies task type, domain, and complexity
+- Suggests key elements and objectives
+- Provides structured analysis for dimension generation
+
+### Professional Dimension Generation
+- Creates domain-specific evaluation criteria
+- Includes detailed scoring rubrics
+- Provides clear performance indicators
+- Supports various task types and complexities
+
+### Clean Output Management
+- Generates human-readable markdown files
+- Maintains version history through task IDs
+- Enables easy sharing and collaboration
+- Supports both single-file and multi-file workflows
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 🐛 Issues & Support
+
+If you encounter any issues or have questions, please [open an issue](https://github.com/magenie33/quality-dimension-generator/issues) on GitHub.
+
+---
+
+*Quality Dimension Generator - Professional task evaluation made simple*
+
+Output: Formatted prompts + Task ID + Usage instructions
+```
+
+### 3. save_quality_dimensions ⭐ 
+Save LLM-generated dual output results
+```typescript
+Input:
+- taskId: string - Task ID
+- projectPath: string - Project path
+- refinedTaskDescription: string - LLM-refined task description (first stage output)
+- dimensionsContent: string - LLM-generated evaluation dimensions (second stage output)
+- taskAnalysisJson?: string - Original task analysis JSON (optional)
+
+Output: ✅ Save success confirmation + File paths
+```
+
+### 4. get_current_time_context
+Get current time context (auto-detect timezone)
+```typescript
+Input:
+- timezone?: string - Timezone (optional, auto-detect system timezone if not specified)
+- locale?: string - Localization settings
+
+Output: Current time objective information, including auto-detected timezone
 ```
 
 ### 5. diagnose_working_directory
-诊断工作目录和环境
+Diagnose working directory and environment
 ```typescript
-输入：无
+Input: None
 
-输出：当前工作目录状态和配置建议
+Output: Current working directory status and configuration recommendations
 ```
 
 ## � 完整工作流程

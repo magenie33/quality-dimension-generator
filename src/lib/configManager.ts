@@ -3,23 +3,23 @@ import { join } from 'path';
 import { QdgDirectoryManager } from './qdgDirectoryManager.js';
 
 /**
- * 配置管理器接口
+ * Configuration Manager Interface
  */
 export interface QdgConfig {
 	version: string;
 	created: string;
 	settings: {
-		// 可配置项
-		dimensionCount: number; // 维度数量，默认5
-		expectedScore: number;  // 期望分数，默认8（0-10分）
+		// Configurable items
+		dimensionCount: number; // Number of dimensions, default 5
+		expectedScore: number;  // Expected score, default 8 (0-10 scale)
 		
-		// 以下都是固定的，不可配置
-		dimensionFormat: 'markdown'; // 固定使用markdown格式
-		scoringSystem: 'single-dimension-0-10'; // 固定：单维度0-10分制
-		scoreStandards: 'three-tier-guidance'; // 固定：三档次指导说明 (6分及格, 8分优秀, 10分卓越)
-		finalScoreMethod: 'average'; // 固定：所有维度均分
+		// Following are fixed, not configurable
+		dimensionFormat: 'markdown'; // Fixed: use markdown format
+		scoringSystem: 'single-dimension-0-10'; // Fixed: single dimension 0-10 scale
+		scoreStandards: 'three-tier-guidance'; // Fixed: three-tier guidance (6 pass, 8 good, 10 excellent)
+		finalScoreMethod: 'average'; // Fixed: average of all dimensions
 		
-		// 文件设置
+		// File settings
 		defaultIncludePatterns: string[];
 		defaultExcludePatterns: string[];
 		retainTaskDays: number;
@@ -27,23 +27,23 @@ export interface QdgConfig {
 }
 
 /**
- * 默认配置
+ * Default Configuration
  */
 const DEFAULT_CONFIG: QdgConfig = {
 	version: "1.0.0",
 	created: new Date().toISOString(),
 	settings: {
-		// 可配置项
-		dimensionCount: 5, // 默认5个维度
-		expectedScore: 8,  // 默认期望8分
+		// Configurable items
+		dimensionCount: 5, // Default 5 dimensions
+		expectedScore: 8,  // Default expected score 8
 		
-		// 以下都是固定值，不可配置
+		// Following are fixed values, not configurable
 		dimensionFormat: "markdown",
 		scoringSystem: "single-dimension-0-10",
-		scoreStandards: "three-tier-guidance", // 6分(及格)、8分(优秀)、10分(卓越)
+		scoreStandards: "three-tier-guidance", // 6 (pass), 8 (good), 10 (excellent)
 		finalScoreMethod: "average",
 		
-		// 文件设置
+		// File settings
 		defaultIncludePatterns: [
 			"**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx",
 			"**/*.json", "**/*.md", "**/*.yml", "**/*.yaml"
@@ -57,8 +57,8 @@ const DEFAULT_CONFIG: QdgConfig = {
 };
 
 /**
- * 配置管理器
- * 负责读取、写入和验证项目配置
+ * Configuration Manager
+ * Responsible for reading, writing and validating project configuration
  */
 export class ConfigManager {
 	private qdgManager: QdgDirectoryManager;
@@ -68,7 +68,7 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 获取项目配置
+	 * Get project configuration
 	 */
 	async getConfig(projectPath: string): Promise<QdgConfig> {
 		try {
@@ -78,22 +78,22 @@ export class ConfigManager {
 			const content = await fs.readFile(configPath, 'utf-8');
 			const config = JSON.parse(content) as QdgConfig;
 			
-			// 验证和合并默认配置
+			// Validate and merge with defaults
 			return this.mergeWithDefaults(config);
 		} catch {
-			// 配置文件不存在或损坏，返回默认配置
+			// Config file doesn't exist or is corrupted, return default config
 			return { ...DEFAULT_CONFIG };
 		}
 	}
 	
 	/**
-	 * 保存项目配置
+	 * Save project configuration
 	 */
 	async saveConfig(projectPath: string, config: Partial<QdgConfig>): Promise<void> {
-		// 确保 .qdg 目录存在
+		// Ensure .qdg directory exists
 		await this.qdgManager.initializeQdgDirectory(projectPath);
 		
-		// 获取当前配置并合并
+		// Get current config and merge
 		const currentConfig = await this.getConfig(projectPath);
 		const mergedConfig = this.deepMerge(currentConfig, config);
 		
@@ -104,11 +104,11 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 更新维度数量
+	 * Update dimension count
 	 */
 	async updateDimensionCount(projectPath: string, count: number): Promise<void> {
 		if (count < 1 || count > 10) {
-			throw new Error('维度数量必须在1-10之间');
+			throw new Error('Dimension count must be between 1-10');
 		}
 		const config = await this.getConfig(projectPath);
 		config.settings.dimensionCount = count;
@@ -116,11 +116,11 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 更新期望分数
+	 * Update expected score
 	 */
 	async updateExpectedScore(projectPath: string, score: number): Promise<void> {
 		if (score < 0 || score > 10) {
-			throw new Error('期望分数必须在0-10之间');
+			throw new Error('Expected score must be between 0-10');
 		}
 		const config = await this.getConfig(projectPath);
 		config.settings.expectedScore = score;
@@ -128,7 +128,7 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 获取维度数量设置
+	 * Get dimension count setting
 	 */
 	async getDimensionCount(projectPath: string): Promise<number> {
 		const config = await this.getConfig(projectPath);
@@ -136,14 +136,14 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 设置维度数量
+	 * Set dimension count
 	 */
 	async setDimensionCount(projectPath: string, count: number): Promise<void> {
 		await this.updateDimensionCount(projectPath, count);
 	}
 	
 	/**
-	 * 获取期望分数设置
+	 * Get expected score setting
 	 */
 	async getExpectedScore(projectPath: string): Promise<number> {
 		const config = await this.getConfig(projectPath);
@@ -151,14 +151,14 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 设置期望分数
+	 * Set expected score
 	 */
 	async setExpectedScore(projectPath: string, score: number): Promise<void> {
 		await this.updateExpectedScore(projectPath, score);
 	}
 
 	/**
-	 * 获取评分系统设置（固定值）
+	 * Get scoring system settings (fixed values)
 	 */
 	getScoringSettings(): {
 		scoringSystem: 'single-dimension-0-10';
@@ -173,7 +173,7 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 验证配置有效性（验证dimensionCount和expectedScore）
+	 * Validate configuration validity (validate dimensionCount and expectedScore)
 	 */
 	validateConfig(config: Partial<QdgConfig>): string[] {
 		const errors: string[] = [];
@@ -181,14 +181,14 @@ export class ConfigManager {
 		if (config.settings?.dimensionCount !== undefined) {
 			const count = config.settings.dimensionCount;
 			if (typeof count !== 'number' || count < 1 || count > 10) {
-				errors.push('维度数量必须是1-10之间的数字');
+				errors.push('Dimension count must be a number between 1-10');
 			}
 		}
 		
 		if (config.settings?.expectedScore !== undefined) {
 			const score = config.settings.expectedScore;
 			if (typeof score !== 'number' || score < 0 || score > 10) {
-				errors.push('期望分数必须是0-10之间的数字');
+				errors.push('Expected score must be a number between 0-10');
 			}
 		}
 		
@@ -196,14 +196,14 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 合并默认配置
+	 * Merge with default configuration
 	 */
 	private mergeWithDefaults(config: Partial<QdgConfig>): QdgConfig {
 		return this.deepMerge(DEFAULT_CONFIG, config);
 	}
 	
 	/**
-	 * 深度合并对象
+	 * Deep merge objects
 	 */
 	private deepMerge<T>(target: T, source: Partial<T>): T {
 		const result = { ...target };
@@ -222,7 +222,7 @@ export class ConfigManager {
 	}
 	
 	/**
-	 * 获取默认配置
+	 * Get default configuration
 	 */
 	getDefaultConfig(): QdgConfig {
 		return { ...DEFAULT_CONFIG };

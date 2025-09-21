@@ -1,197 +1,176 @@
 /**
- * 评价维度 (原有接口，保持兼容性)
+ * Evaluation Dimension (original interface, maintaining compatibility)
  */
 export interface EvaluationDimension {
-	/** 维度名称 */
+	/** Dimension name */
 	name: string;
-	/** 维度权重 (0-1) */
+	/** Dimension weight (0-1) */
 	weight: number;
-	/** 维度描述 */
+	/** Dimension description */
 	description: string;
-	/** 评价标准 */
+	/** Evaluation criteria */
 	criteria: string[];
-	/** 评价方法 */
+	/** Evaluation method */
 	evaluationMethod?: string;
-	/** 重要性说明 */
+	/** Importance description */
 	importance?: string;
 }
 
 /**
- * 评价维度定义 - 简化版
- * 支持0-2分，5档次评分 (0, 0.5, 1, 1.5, 2)
- */
-export interface EvaluationDimension {
-	/** 维度名称 */
-	name: string;
-	/** 维度权重 (每个维度0.2，总计5个维度) */
-	weight: number;
-	/** 维度描述 */
-	description: string;
-	/** 评分标准 (5档次: 2.0分、1.5分、1.0分、0.5分、0.0分) */
-	criteria: string[];
-	/** 评价方法 (0-2分制评分，5档次) */
-	evaluationMethod?: string;
-	/** 重要性说明 */
-	importance?: string;
-}
-
-/**
- * 任务分析结果
+ * Task Analysis Result
  */
 export interface TaskAnalysis {
-	/** 提炼出的核心任务 */
+	/** Extracted core task */
 	coreTask: string;
-	/** 任务类型 */
+	/** Task type */
 	taskType: string;
-	/** 任务复杂度 (1-5) */
+	/** Task complexity (1-5) */
 	complexity: number;
-	/** 任务领域 */
+	/** Task domain */
 	domain: string;
-	/** 关键要素 */
+	/** Key elements */
 	keyElements: string[];
-	/** 任务目标 */
+	/** Task objectives */
 	objectives: string[];
 }
 
 /**
- * 时间上下文信息
+ * Time Context Information
  */
 export interface TimeContext {
-	/** 当前时间戳 */
+	/** Current timestamp */
 	timestamp: number;
-	/** 格式化的时间字符串 */
+	/** Formatted time string */
 	formattedTime: string;
-	/** 时区信息 */
+	/** Timezone information */
 	timezone: string;
-	/** 年份 */
+	/** Year */
 	year: number;
-	/** 月份 */
+	/** Month */
 	month: number;
-	/** 日期 */
+	/** Day */
 	day: number;
-	/** 星期几 */
+	/** Day of week */
 	weekday: string;
 }
 
 /**
- * 质量评价结果
+ * Quality Evaluation Result
  */
 export interface QualityEvaluationResult {
-	/** 分析的任务 */
+	/** Analyzed task */
 	task: TaskAnalysis;
-	/** 时间上下文 */
+	/** Time context */
 	timeContext: TimeContext;
-	/** 生成的评价维度 */
+	/** Generated evaluation dimensions */
 	evaluationDimensions: EvaluationDimension[];
-	/** 生成时间 */
+	/** Generation time */
 	generatedAt: string;
-	/** 评价框架版本 */
+	/** Framework version */
 	frameworkVersion: string;
 }
 
 /**
- * 对话分析输入
+ * Conversation Analysis Input
  */
 export interface ConversationInput {
-	/** 用户消息 */
+	/** User message */
 	userMessage: string;
-	/** 对话历史 (可选) */
+	/** Conversation history (optional) */
 	conversationHistory?: Array<{
 		role: 'user' | 'assistant';
 		content: string;
 		timestamp?: number;
 	}>;
-	/** 上下文信息 (可选) */
+	/** Context information (optional) */
 	context?: Record<string, unknown>;
 }
 
 /**
- * 工具调用参数
+ * Tool Call Parameters
  */
 export interface GenerateEvaluationParams {
-	/** 对话输入 */
+	/** Conversation input */
 	conversation: ConversationInput;
-	/** 是否包含详细分析 */
+	/** Whether to include detailed analysis */
 	includeDetailedAnalysis?: boolean;
-	/** 自定义评价框架 */
+	/** Custom evaluation framework */
 	customFramework?: string;
-	/** 特定领域偏好 */
+	/** Specific domain preference */
 	domainPreference?: string;
 }
 
 /**
- * 项目文件信息
+ * Project File Information
  */
 export interface ProjectFile {
-	/** 相对路径 */
+	/** Relative path */
 	relativePath: string;
-	/** 完整路径 */
+	/** Full path */
 	fullPath: string;
-	/** 文件内容 */
+	/** File content */
 	content: string;
-	/** 文件大小（字符数） */
+	/** File size (character count) */
 	size: number;
-	/** 文件扩展名 */
+	/** File extension */
 	extension: string;
-	/** 行数 */
+	/** Line count */
 	lines: number;
 }
 
 /**
- * 综合项目数据
+ * Comprehensive Project Data
  */
 export interface ProjectData {
-	/** 项目文件列表 */
+	/** Project file list */
 	files: ProjectFile[];
-	/** 项目目录结构 */
+	/** Project directory structure */
 	structure: string;
-	/** 文件总数 */
+	/** Total file count */
 	fileCount: number;
-	/** 总大小（字符数） */
+	/** Total size (character count) */
 	totalSize: number;
-	/** 总行数 */
+	/** Total line count */
 	totalLines: number;
 }
 
 /**
- * 维度评分结果
+ * Dimension Score Result
  */
 export interface DimensionScore {
-	/** 维度名称 */
+	/** Dimension name */
 	dimensionName: string;
-	/** 评分 (0-100) */
+	/** Score (0-100) */
 	score: number;
-	/** 评分等级 */
+	/** Score grade */
 	grade: 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F';
-	/** 评分理由 */
+	/** Score reason */
 	reason: string;
-	/** 具体表现分析 */
+	/** Specific performance analysis */
 	performanceAnalysis: string;
-	/** 改进建议 */
+	/** Improvement suggestions */
 	improvementSuggestions: string[];
-	/** 参考标准 */
+	/** Benchmark comparison */
 	benchmarkComparison?: string;
 }
 
-
-
 /**
- * 任务评估输入参数
+ * Task Evaluation Input Parameters
  */
 export interface EvaluateTaskParams {
-	/** 原始任务描述 */
+	/** Original task description */
 	originalTask: string;
-	/** LLM完成的工作内容 */
+	/** LLM completed work content */
 	completedWork: string;
-	/** 之前生成的评价框架 */
+	/** Previously generated evaluation framework */
 	evaluationFramework?: QualityEvaluationResult;
-	/** 或者重新生成评价框架的参数 */
+	/** Or parameters to regenerate evaluation framework */
 	generateFramework?: {
 		conversation: ConversationInput;
 		domainPreference?: string;
 		customFramework?: string;
 	};
-	/** 评估配置 */
+	/** Evaluation configuration */
 	evaluationConfig?: {
 		strictness: 'lenient' | 'standard' | 'strict';
 		focusAreas?: string[];
@@ -201,98 +180,67 @@ export interface EvaluateTaskParams {
 }
 
 /**
- * 第二个功能：评分输入参数
+ * Second Feature: Scoring Input Parameters
  */
 export interface EvaluateTaskParams2 {
-	/** 原始评价维度（从第一个功能获得） */
+	/** Original evaluation dimensions (from first feature) */
 	evaluationDimensions: EvaluationDimension[];
-	/** LLM完成的任务内容 */
+	/** LLM completed task content */
 	completedTask: {
-		/** 任务内容或输出 */
+		/** Task content or output */
 		content: string;
-		/** 原始任务描述（可选） */
+		/** Original task description (optional) */
 		originalTask?: string;
-		/** 任务类型 */
+		/** Task type */
 		taskType?: string;
-		/** 完成时间 */
+		/** Completion time */
 		completedAt?: string;
-		/** 额外的上下文信息 */
+		/** Additional context information */
 		context?: Record<string, unknown>;
 	};
-	/** 评分标准（0-10分制，5维度×2分） */
+	/** Scoring standard (0-10 scale, 5 dimensions × 2 points) */
 	scaleType?: '0-10-simplified';
-	/** 是否提供详细的改进建议 */
+	/** Whether to provide detailed improvement suggestions */
 	includeImprovementSuggestions?: boolean;
 }
 
 /**
- * 单个维度的评分结果
- */
-export interface DimensionScore {
-	/** 维度名称 */
-	dimensionName: string;
-	/** 评分（根据scaleType） */
-	score: number;
-	/** 最大分数 */
-	maxScore: number;
-	/** 置信度 (0-1) */
-	confidence: number;
-	/** 评分理由 */
-	reason: string;
-	/** 表现亮点 */
-	strengths: string[];
-	/** 改进点 */
-	weaknesses: string[];
-	/** 具体改进建议 */
-	improvementSuggestions: string[];
-	/** 是否达到及格线 */
-	isAcceptable: boolean;
-	/** 分析详情 */
-	analysisDetails: {
-		criteriaMatched: number;
-		totalCriteria: number;
-		keyStrengths: string[];
-		keyWeaknesses: string[];
-	};
-}
-
-/**
- * 综合评价结果（第二个功能的输出）
+ * Comprehensive Evaluation Result (output of second feature)
  */
 export interface TaskEvaluationResult {
-	/** 任务基本信息 */
+	/** Task basic information */
 	taskInfo: {
 		originalTask: string;
 		completedContent: string;
 		evaluatedAt: string;
 		scaleType: '1-5' | '1-10';
 	};
-	/** 各维度评分 */
+	/** Dimension scores */
 	dimensionScores: DimensionScore[];
-	/** 综合评分统计 */
+	/** Overall score statistics */
 	overallScore: {
-		/** 加权总分 */
+		/** Weighted total score */
 		totalScore: number;
-		/** 最大可能分数 */
+		/** Maximum possible score */
 		maxPossibleScore: number;
-		/** 百分比得分 */
+		/** Percentage score */
 		percentageScore: number;
-		/** 等级评价 */
+		/** Grade evaluation */
 		grade: 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F';
-		/** 是否通过 */
+		/** Whether passed */
 		passed: boolean;
 	};
-	/** 综合分析 */
+	/** Comprehensive analysis */
 	analysis: {
-		/** 主要优势 */
+		/** Main strengths */
 		mainStrengths: string[];
-		/** 主要问题 */
+		/** Main weaknesses */
 		mainWeaknesses: string[];
-		/** 优先改进建议 */
+		/** Priority improvement suggestions */
 		prioritySuggestions: string[];
-		/** 下一步行动建议 */
+		/** Next action recommendations */
 		nextActions: string[];
 	};
-	/** 评价框架版本 */
+	/** Framework version */
 	frameworkVersion: string;
 }

@@ -1,17 +1,17 @@
 import { TimeContext } from './types.js';
 
 /**
- * 时间上下文管理器 - 简化版
- * 只提供基本的时间和时区信息，不做主观判断
+ * Time Context Manager
+ * Provides basic time and timezone information
  */
 export class TimeContextManager {
 	/**
-	 * 获取当前时间上下文
+	 * Get current time context
 	 */
-	public getCurrentTimeContext(timezone?: string, locale = 'zh-CN'): TimeContext {
+	public getCurrentTimeContext(timezone?: string, locale = 'en-US'): TimeContext {
 		const now = new Date();
 		
-		// 如果指定了时区，则转换时间
+		// Convert time if timezone is specified
 		const targetTime = timezone ? this.convertToTimezone(now, timezone) : now;
 		
 		return {
@@ -19,18 +19,18 @@ export class TimeContextManager {
 			formattedTime: this.formatDateTime(targetTime, locale),
 			timezone: timezone || this.getSystemTimezone(),
 			year: targetTime.getFullYear(),
-			month: targetTime.getMonth() + 1, // JavaScript 月份从0开始
+			month: targetTime.getMonth() + 1, // JavaScript months start from 0
 			day: targetTime.getDate(),
 			weekday: this.getWeekdayName(targetTime, locale)
 		};
 	}
 
 	/**
-	 * 转换到指定时区
+	 * Convert to specified timezone
 	 */
 	private convertToTimezone(date: Date, timezone: string): Date {
 		try {
-			// 使用 Intl.DateTimeFormat 进行时区转换
+			// Use Intl.DateTimeFormat for timezone conversion
 			const formatter = new Intl.DateTimeFormat('en-US', {
 				timeZone: timezone,
 				year: 'numeric',
@@ -63,7 +63,7 @@ export class TimeContextManager {
 	}
 
 	/**
-	 * 获取系统时区
+	 * Get system timezone
 	 */
 	private getSystemTimezone(): string {
 		try {
@@ -74,7 +74,7 @@ export class TimeContextManager {
 	}
 
 	/**
-	 * 格式化日期时间
+	 * Format date and time
 	 */
 	private formatDateTime(date: Date, locale: string): string {
 		try {
@@ -89,19 +89,19 @@ export class TimeContextManager {
 				timeZoneName: 'short'
 			}).format(date);
 		} catch {
-			// 如果本地化失败，使用默认格式
+			// Use default format if localization fails
 			return date.toLocaleString();
 		}
 	}
 
 	/**
-	 * 获取星期几名称
+	 * Get weekday name
 	 */
 	private getWeekdayName(date: Date, locale: string): string {
 		try {
 			return new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(date);
 		} catch {
-			const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+			const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 			return weekdays[date.getDay()];
 		}
 	}
