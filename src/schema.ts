@@ -2,19 +2,23 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * MCP Quality Dimension Generator - Tool Schema Definitions
- * Standard interface for LLMs t	TASK_ANALYSIS_PROMPT_TOOL,         // Step 1: Analyze task
-	QUALITY_DIMENSIONS_PROMPT_TOOL,    // Step 2: Generate prompts
-	SAVE_QUALITY_DIMENSIONS_TOOL,      // Step 3: Save LLM output
-	TIME_CONTEXT_TOOL,                 // Helper: Time context
-	DIAGNOSE_WORKING_DIRECTORY_TOOL    // Helper: Directory diagnosiserstand and call quality evaluation tools
+ * Standard interface for LLMs to understand and call quality evaluation tools
+ * 
+ * Tool Usage Order:
+ * 1. TASK_ANALYSIS_PROMPT_TOOL         - Analyze task
+ * 2. QUALITY_DIMENSIONS_PROMPT_TOOL    - Generate prompts  
+ * 3. SAVE_QUALITY_DIMENSIONS_TOOL      - Save LLM output
+ * 4. TIME_CONTEXT_TOOL                 - Helper: Time context
+ * 5. DIAGNOSE_WORKING_DIRECTORY_TOOL   - Helper: Directory diagnosis
  */
 
 /**
  * Task analysis prompt generation tool
+ * Generates structured prompts for LLM to analyze user tasks with enhanced workflow guidance
  */
 export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 	name: 'generate_task_analysis_prompt',
-	description: 'Generate task analysis prompt to help LLM analyze core tasks in user conversations',
+	description: 'Generate task analysis prompt for LLM to analyze core tasks in user conversations with workflow guidance and next-step instructions',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -57,10 +61,11 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 
 /**
  * Quality dimension prompt generator tool
+ * Creates comprehensive evaluation frameworks with flat file structure and progress tracking
  */
 export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 	name: 'generate_quality_dimensions_prompt',
-	description: 'Generate quality dimension prompts and create task records, allowing LLMs to generate professional evaluation dimensions based on tasks',
+	description: 'Generate quality dimension prompts and create task records with flat file structure, providing comprehensive workflow guidance and progress tracking',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -80,7 +85,7 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 			locale: {
 				type: 'string',
 				description: 'Localization settings',
-				default: 'zh-CN'
+				default: 'en-US'
 			},
 			projectPath: {
 				type: 'string',
@@ -92,11 +97,12 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 };
 
 /**
- * Quality dimension save tool - Save LLM dual-output results
+ * Quality dimension save tool - Save LLM dual-output results with semantic naming
+ * Implements flat file structure with taskId_taskName.md naming convention
  */
 export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 	name: 'save_quality_dimensions',
-	description: 'Save LLM-generated task refinement and evaluation dimension standards to .qdg directory',
+	description: 'Save LLM-generated task refinement and evaluation dimension standards to .qdg directory using flat file structure with semantic naming',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -149,10 +155,11 @@ export const TIME_CONTEXT_TOOL: Tool = {
 
 /**
  * Working directory diagnosis tool
+ * Provides comprehensive environment diagnosis with troubleshooting guidance
  */
 export const DIAGNOSE_WORKING_DIRECTORY_TOOL: Tool = {
 	name: 'diagnose_working_directory',
-	description: 'Diagnose current working directory and MCP server runtime environment, help resolve path-related issues',
+	description: 'Diagnose current working directory and MCP server runtime environment with detailed troubleshooting guidance and project discovery',
 	inputSchema: {
 		type: 'object',
 		properties: {}

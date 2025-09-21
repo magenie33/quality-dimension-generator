@@ -202,14 +202,32 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: prompt
+							text: `🎯 **STAGE 1 COMPLETE: Task Analysis Prompt Generated**
+
+📋 **NEXT STEPS TO COMPLETE THE WORKFLOW:**
+
+**Step 1**: Copy the prompt below and send it to the LLM to get task analysis JSON
+**Step 2**: Once you receive the JSON result, call \`generate_quality_dimensions_prompt\` with the JSON
+**Step 3**: After getting dimension standards, call \`save_quality_dimensions\` to save the final result
+
+⚠️ **IMPORTANT**: You must execute the prompt below to get JSON output, then proceed to Stage 2!
+
+---
+
+## 📝 Task Analysis Prompt (Send this to LLM):
+
+${prompt}
+
+---
+
+🔄 **WORKFLOW STATUS**: Stage 1/3 Complete → **Next: Execute the above prompt**`
 						}]
 					};
 				} catch (error) {
 					return {
 						content: [{
 							type: "text",
-							text: `Error: ${error instanceof Error ? error.message : String(error)}`
+							text: `❌ **STAGE 1 ERROR**: Task analysis prompt generation failed\n\n🔧 **Error Details**: ${error instanceof Error ? error.message : String(error)}\n\n💡 **Troubleshooting**:\n- Check your input parameters\n- Ensure conversation history format is correct\n- Try again with simplified input\n\n🔄 **WORKFLOW STATUS**: ❌ Stage 1/3 Failed → **Fix error and retry**`
 						}],
 						isError: true
 					};
@@ -322,14 +340,14 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: responseText
+							text: `🎯 **STAGE 2 COMPLETE: Quality Dimensions Prompt Generated**\n\n📋 **CRITICAL NEXT STEPS:**\n\n**Step 1**: Copy the TWO-STAGE prompt below and send it to the LLM\n**Step 2**: LLM will provide TWO outputs: (1) Refined task description + (2) Quality dimensions\n**Step 3**: Call \`save_quality_dimensions\` with BOTH outputs to complete the workflow\n\n⚠️ **IMPORTANT**: You MUST execute the prompt below and get BOTH LLM outputs, then save them!\n\n---\n\n${responseText}\n\n---\n\n🔄 **WORKFLOW STATUS**: Stage 2/3 Complete → **Next: Execute prompt above, then save results**`
 						}]
 					};
 				} catch (error) {
 					return {
 						content: [{
 							type: "text",
-							text: `Error: ${error instanceof Error ? error.message : String(error)}`
+							text: `❌ **STAGE 2 ERROR**: Quality dimensions prompt generation failed\n\n🔧 **Error Details**: ${error instanceof Error ? error.message : String(error)}\n\n💡 **Troubleshooting**:\n- Verify taskAnalysisJson format is correct\n- Check if task analysis contains all required fields\n- Ensure project path is accessible\n- Try with default target score\n\n🔄 **WORKFLOW STATUS**: ❌ Stage 2/3 Failed → **Fix error and retry from Stage 1**`
 						}],
 						isError: true
 					};
@@ -413,14 +431,14 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: `✅ Quality evaluation standards saved successfully!\n\n🎯 Task ID: ${taskId}\n📝 Task Name: ${taskName}\n📁 Saved file: ${path.relative(projectPath, outputFilePath)}\n📋 Status: Task description and evaluation standards saved in flat file structure\n\n🚀 Now you can start executing the task and evaluate according to the saved standards after completion!`
+							text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**\n\n✅ **STAGE 3 COMPLETE**: Quality evaluation standards saved successfully!\n\n📊 **Final Results:**\n🎯 Task ID: ${taskId}\n📝 Task Name: ${taskName}\n📁 Saved file: ${path.relative(projectPath, outputFilePath)}\n📋 File Structure: Flat file system with semantic naming\n\n🔄 **WORKFLOW STATUS**: ✅ Stage 1/3 ✅ Stage 2/3 ✅ Stage 3/3 → **COMPLETED**\n\n🚀 **READY FOR EXECUTION**: You can now start executing the task and evaluate according to the saved standards after completion!\n\n💡 **Quality Standards Location**: Check the saved markdown file for detailed evaluation criteria and scoring guidelines.`
 						}]
 					};
 				} catch (error) {
 					return {
 						content: [{
-							type: "text", 
-							text: `❌ Save failed: ${error instanceof Error ? error.message : String(error)}`
+							type: "text",
+							text: `❌ **STAGE 3 ERROR**: Save quality dimensions failed\n\n🔧 **Error Details**: ${error instanceof Error ? error.message : String(error)}\n\n💡 **Troubleshooting**:\n- Check if project path exists and is writable\n- Verify taskId format is correct\n- Ensure refined task description and dimensions content are provided\n- Check disk space availability\n\n🔄 **WORKFLOW STATUS**: ✅ Stage 1/3 ✅ Stage 2/3 ❌ Stage 3/3 Failed → **Fix error and retry Stage 3 only**`
 						}],
 						isError: true
 					};

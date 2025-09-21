@@ -20,10 +20,12 @@ Quality Dimension Generator analyzes your tasks and automatically creates profes
 ## 🌟 Key Features
 
 ### Core Capabilities
-- **Intelligent Task Analysis** - Extract and refine core tasks from conversations with LLM-generated semantic naming
-- **Dynamic Dimension Generation** - Create custom evaluation frameworks
+- **Enhanced Workflow Guidance** - Step-by-step progress tracking with clear next-action instructions
+- **Intelligent Task Analysis** - Extract and refine core tasks with LLM-generated semantic naming
+- **Dynamic Dimension Generation** - Create custom evaluation frameworks with professional standards
 - **Flat File Architecture** - Streamlined storage with `taskId_TaskName.md` naming for easy organization
-- **Dual-Output Workflow** - Separate task refinement and dimension generation
+- **Progressive Status Tracking** - Visual progress indicators (Stage 1/3 → Stage 2/3 → Stage 3/3 Complete)
+- **Enhanced Error Handling** - Comprehensive troubleshooting guidance with specific recovery steps
 - **Smart Deduplication** - Avoid duplicate work with content-based hashing
 - **Timezone Intelligence** - Automatic detection and localization
 
@@ -60,11 +62,11 @@ The tool automatically creates a `.qdg` directory in your project:
 ```
 .qdg/
 ├── config/
-│   └── qdg.config.json           # Configuration settings
+│   └── qdg.config.json                    # Configuration settings
 └── tasks/
-    ├── task_[id]_[TaskName].md   # Quality evaluation standards (flat files)
-    ├── task_[id]_[AnotherTask].md
-    └── task_[id]_[ThirdTask].md
+    ├── task_[timestamp]_[hash]_TaskName.md     # Quality evaluation standards (flat files)
+    ├── task_[timestamp]_[hash]_AnotherTask.md  # LLM-generated semantic naming  
+    └── task_[timestamp]_[hash]_ThirdTask.md   # Organized by content, not folders
 ```
 
 Configure dimensions and scoring in `.qdg/config/qdg.config.json`:
@@ -79,38 +81,46 @@ Configure dimensions and scoring in `.qdg/config/qdg.config.json`:
 
 ## 📖 Usage Guide
 
-### Basic Workflow
+## 🔄 Three-Stage Workflow
 
-#### 1. Analyze Your Task
+### Stage 1: Task Analysis with Workflow Guidance
 ```javascript
-// Use the generate_task_analysis_prompt tool
-{
-  "userMessage": "Create a user authentication system",
-  "conversationHistory": [/* previous messages */],
-  "context": {/* additional context */}
-}
+// Enhanced with progress tracking and next-step instructions
+generate_task_analysis_prompt
 ```
+**Features**: 
+- ✅ Clear progress indicators (Stage 1/3 Complete)
+- 📋 Detailed next-step instructions
+- ⚠️ Important reminders for LLM execution
+- 🔧 Enhanced error handling with troubleshooting guidance
 
-#### 2. Generate Quality Dimensions
-```javascript
-// Use the generate_quality_dimensions_prompt tool
-{
-  "taskAnalysisJson": "{\"coreTask\": \"...\", \"taskType\": \"...\"}",
-  "targetScore": 8,
-  "projectPath": "/path/to/project"
-}
-```
+**Output**: Structured LLM prompt with workflow guidance
 
-#### 3. Save Evaluation Standards
+### Stage 2: Quality Dimensions with Progress Tracking  
 ```javascript
-// Use the save_quality_dimensions tool
-{
-  "taskId": "task_1234567890_abcd1234",
-  "projectPath": "/path/to/project",
-  "refinedTaskDescription": "Refined task description from LLM",
-  "dimensionsContent": "Complete evaluation dimensions from LLM"
-}
+// Enhanced with critical step emphasis and completion guidance
+generate_quality_dimensions_prompt
 ```
+**Features**:
+- 🎯 Stage completion confirmation (Stage 2/3 Complete)
+- 📋 Critical next-steps highlighting
+- 🔄 TWO-STAGE output emphasis
+- 🔧 Detailed error recovery procedures
+
+**Output**: Professional evaluation dimensions with save instructions
+
+### Stage 3: Enhanced Results Saving
+```javascript
+// Enhanced with workflow completion celebration and file details
+save_quality_dimensions  
+```
+**Features**:
+- 🎉 Complete workflow success confirmation
+- ✅ Full progress tracking (Stage 1/3 ✅ Stage 2/3 ✅ Stage 3/3)
+- 📁 Flat file structure with semantic naming
+- 🚀 Ready-for-execution guidance
+
+**Output**: Saved evaluation standards with detailed file information
 
 ### Advanced Usage
 
