@@ -236,7 +236,7 @@ ${prompt}
 📋 **LLM INSTRUCTIONS - Execute Automatically:**
 
 **Step 1**: Execute the prompt below to get task analysis JSON
-**Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON and targetScore (1-10 to set evaluation strictness)
+**Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON result
 **Step 3**: Optionally call \`save_quality_dimensions\` to save standards to .qdg directory (will auto-create directory)
 
 ⚠️ **LLM**: Execute the prompt below to get JSON output, then automatically proceed to Stage 2!
