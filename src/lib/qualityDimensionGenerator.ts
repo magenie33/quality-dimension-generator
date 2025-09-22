@@ -1,4 +1,4 @@
-import { TaskAnalysis, TimeContext, QualityDimensionsResponse, QualityDimension, validateQualityDimensions } from './types.js';
+import { TaskAnalysis, TimeContext, QualityDimensionsResponse, QualityDimension } from './types.js';
 
 /**
  * Quality Evaluation Dimension Generator
@@ -46,6 +46,8 @@ Please analyze according to the following requirements and output the result in 
 
 \`\`\`json
 {
+  "expectedScore": ${expectedScore},
+  "scoreCalculation": "Average of all ${dimensionCount} dimension scores",
   "dimensions": [
     {
       "name": "Dimension name (3-15 characters, specific and clear)",
@@ -84,6 +86,7 @@ Please analyze according to the following requirements and output the result in 
 
 ## ⚠️ JSON Format Requirements
 - Ensure valid JSON syntax with proper quotes and commas
+- Root object must include expectedScore (number) and scoreCalculation (string) fields
 - Each dimension object must include all 4 fields: name, description, importance, scoring
 - Scoring object must have exactly 3 levels: "6", "8", "10"
 - All text should be professional and specific to the task domain
@@ -98,7 +101,7 @@ Please ensure the JSON is complete, valid, and directly usable for evaluation pu
 	}
 	
 	/**
-	 * Parse and validate LLM-returned quality dimensions result
+	 * Parse LLM-returned quality dimensions result
 	 */
 	public parseQualityDimensionsResult(llmResponse: string): QualityDimensionsResponse {
 		// Extract JSON part
@@ -107,13 +110,22 @@ Please ensure the JSON is complete, valid, and directly usable for evaluation pu
 			throw new Error('JSON format quality dimensions result not found');
 		}
 
-		// Validate JSON format and structure
-		const validation = validateQualityDimensions(jsonMatch[1], this.dimensionCount);
-		if (!validation.isValid) {
-			throw new Error(`Quality dimensions validation failed:\n${validation.errors.join('\n')}`);
+		const result = JSON.parse(jsonMatch[1]);
+		
+		// Basic validation
+		if (!result.dimensions || !Array.isArray(result.dimensions)) {
+			throw new Error('Missing or invalid dimensions array');
 		}
 
-		return validation.data as QualityDimensionsResponse;
+		if (typeof result.expectedScore !== 'number') {
+			throw new Error('Missing or invalid expectedScore field');
+		}
+
+		if (typeof result.scoreCalculation !== 'string') {
+			throw new Error('Missing or invalid scoreCalculation field');
+		}
+
+		return result as QualityDimensionsResponse;
 	}
 
 	/**
@@ -133,6 +145,14 @@ Please ensure the JSON is complete, valid, and directly usable for evaluation pu
 			throw new Error('Invalid structure: missing or invalid dimensions array');
 		}
 
+		if (typeof result.expectedScore !== 'number') {
+			throw new Error('Missing or invalid expectedScore field');
+		}
+
+		if (typeof result.scoreCalculation !== 'string') {
+			throw new Error('Missing or invalid scoreCalculation field');
+		}
+
 		// Validate dimension count
 		if (result.dimensions.length !== this.dimensionCount) {
 			throw new Error(`Expected ${this.dimensionCount} dimensions, got ${result.dimensions.length}`);
@@ -144,6 +164,8 @@ Please ensure the JSON is complete, valid, and directly usable for evaluation pu
 		});
 
 		return {
+			expectedScore: result.expectedScore,
+			scoreCalculation: result.scoreCalculation,
 			dimensions: result.dimensions as QualityDimension[]
 		};
 	}

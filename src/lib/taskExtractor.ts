@@ -1,4 +1,4 @@
-import { TaskAnalysis, ConversationInput, validateTaskAnalysis } from './types.js';
+import { TaskAnalysis, ConversationInput } from './types.js';
 
 /**
  * Task Extractor Class - Pure prompt approach
@@ -47,7 +47,7 @@ Please ensure the analysis is accurate, specific, and practical.`;
 	}
 
 	/**
-	 * Parse LLM-returned task analysis result with validation
+	 * Parse LLM-returned task analysis result
 	 */
 	public parseTaskAnalysisResult(llmResponse: string): TaskAnalysis {
 		// Extract JSON part
@@ -56,13 +56,22 @@ Please ensure the analysis is accurate, specific, and practical.`;
 			throw new Error('JSON format analysis result not found');
 		}
 
-		// Validate JSON format and structure
-		const validation = validateTaskAnalysis(jsonMatch[1]);
-		if (!validation.isValid) {
-			throw new Error(`Task analysis validation failed:\n${validation.errors.join('\n')}`);
+		const result = JSON.parse(jsonMatch[1]);
+		
+		// Validate required fields
+		if (!result.coreTask || !result.taskType || !result.domain || !result.taskName) {
+			throw new Error('Analysis result missing required fields');
 		}
 
-		return validation.data as TaskAnalysis;
+		return {
+			coreTask: result.coreTask,
+			taskName: result.taskName,
+			taskType: result.taskType,
+			complexity: result.complexity || 3,
+			domain: result.domain,
+			keyElements: Array.isArray(result.keyElements) ? result.keyElements : [],
+			objectives: Array.isArray(result.objectives) ? result.objectives : []
+		};
 	}
 
 	/**
