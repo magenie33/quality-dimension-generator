@@ -86,10 +86,6 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 				type: 'string',
 				description: 'Localization settings',
 				default: 'en-US'
-			},
-			projectPath: {
-				type: 'string',
-				description: 'Project path (optional, for saving task records)'
 			}
 		},
 		required: ['taskAnalysisJson']
@@ -110,10 +106,6 @@ export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 				type: 'string',
 				description: 'Task ID'
 			},
-			projectPath: {
-				type: 'string',
-				description: 'Project path'
-			},
 			refinedTaskDescription: {
 				type: 'string',
 				description: 'LLM-refined task description (first stage output)'
@@ -127,7 +119,7 @@ export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 				description: 'Original task analysis JSON (optional, for basic information)'
 			}
 		},
-		required: ['taskId', 'projectPath', 'refinedTaskDescription', 'dimensionsContent']
+		required: ['taskId', 'refinedTaskDescription', 'dimensionsContent']
 	}
 };
 

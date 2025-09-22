@@ -78,45 +78,14 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 		return resolvedPath;
 	};
 	const discoverQdgProjects = (): Array<{qdgPath: string, projectPath: string}> => {
-		const env = process.env;
 		const discoveredProjects: Array<{qdgPath: string, projectPath: string}> = [];
 		
-		// Dynamic path discovery based on common project locations
-		const commonPaths = [
-			process.env.PROJECT_BASE_PATH, // Allow environment override
-			'D:\\MEGA\\Projects',
-			'C:\\Users\\' + (env.USERNAME || 'user') + '\\Projects',
-			'C:\\Projects', 
-			'D:\\Projects',
-			process.cwd(), // Current working directory
-			path.dirname(process.cwd()) // Parent of current directory
-		].filter(Boolean); // Remove undefined/null values
+		// Only check current directory for .qdg projects
+		const currentDir = process.cwd();
+		const qdgPath = path.join(currentDir, '.qdg');
 		
-		for (const basePath of commonPaths) {
-			try {
-				if (fs.existsSync(basePath!)) {
-					// Check if basePath itself is a project directory
-					const directQdgPath = path.join(basePath!, '.qdg');
-					if (fs.existsSync(directQdgPath)) {
-						discoveredProjects.push({ qdgPath: directQdgPath, projectPath: basePath! });
-						continue;
-					}
-					
-					// Search subdirectories for projects
-					const items = fs.readdirSync(basePath!, { withFileTypes: true });
-					for (const item of items) {
-						if (item.isDirectory()) {
-							const projectPath = path.join(basePath!, item.name);
-							const qdgPath = path.join(projectPath, '.qdg');
-							if (fs.existsSync(qdgPath)) {
-								discoveredProjects.push({ qdgPath, projectPath });
-							}
-						}
-					}
-				}
-			} catch (error) {
-				// Continue searching other paths
-			}
+		if (fs.existsSync(qdgPath)) {
+			discoveredProjects.push({ qdgPath, projectPath: currentDir });
 		}
 		
 		return discoveredProjects;
@@ -200,13 +169,12 @@ ${prompt}
 					content: z.string(),
 					timestamp: z.number().optional()
 				})).optional().describe("Conversation history records"),
-				context: z.record(z.unknown()).optional().describe("Additional context information"),
-				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)")
+				context: z.record(z.unknown()).optional().describe("Additional context information")
 			},
-			async ({ userMessage, conversationHistory, context, projectPath }) => {
+			async ({ userMessage, conversationHistory, context }) => {
 				try {
 					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
+					const resolvedProjectPath = await ensureQdgDirectory();
 					
 					const conversation: ConversationInput = {
 						userMessage,
@@ -266,13 +234,12 @@ ${prompt}
 				taskAnalysisJson: z.string().describe("Task analysis JSON result"),
 				targetScore: z.number().default(8).describe("Target score (0-10 scale, used to guide evaluation criteria strictness)"),
 				timezone: z.string().optional().describe("Timezone"),
-				locale: z.string().default("en-US").describe("Localization settings"),
-				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)")
+				locale: z.string().default("en-US").describe("Localization settings")
 			},
-			async ({ taskAnalysisJson, targetScore, timezone, locale, projectPath }) => {
+			async ({ taskAnalysisJson, targetScore, timezone, locale }) => {
 				try {
 					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
+					const resolvedProjectPath = await ensureQdgDirectory();
 					
 					// Parse task analysis result
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
@@ -351,9 +318,9 @@ ${prompt}
 						responseText += `\n   - Complete evaluation dimension system (second stage output)`;
 						responseText += `\n3. Automatically call save_quality_dimensions tool with:`;
 						responseText += `\n   - taskId: ${finalTaskId}`;
-						responseText += `\n   - projectPath: ${resolvedProjectPath}`;
 						responseText += `\n   - refinedTaskDescription: [LLM first output]`;
 						responseText += `\n   - dimensionsContent: [LLM second output]`;
+						responseText += `\n\n✅ **Working Directory**: ${resolvedProjectPath}`;
 						responseText += `\n\n**LLM**: After Stage 3, you will have complete task understanding and quality standards to guide your execution!`;
 					} catch (initError) {
 						console.warn('Failed to initialize task directory:', initError);
@@ -406,15 +373,14 @@ ${responseText}
 			"Save LLM-generated task refinement and evaluation dimension standards to .qdg directory",
 			{
 				taskId: z.string().describe("Task ID"),
-				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)"),
 				refinedTaskDescription: z.string().describe("LLM-refined task description (first stage output)"),
 				dimensionsContent: z.string().describe("LLM-generated complete evaluation dimension content (second stage output)"),
 				taskAnalysisJson: z.string().optional().describe("Original task analysis JSON (optional, for basic information)")
 			},
-			async ({ taskId, projectPath, refinedTaskDescription, dimensionsContent, taskAnalysisJson }) => {
+			async ({ taskId, refinedTaskDescription, dimensionsContent, taskAnalysisJson }) => {
 				try {
 					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
+					const resolvedProjectPath = await ensureQdgDirectory();
 					
 					// Parse task analysis (if provided)
 					let task: any = {};
