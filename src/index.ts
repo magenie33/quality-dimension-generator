@@ -63,22 +63,11 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 		return `task_${timestamp}_${random}`;
 	};
 
-	// Helper function to auto-detect or use provided project path
+	// Helper function to get current working directory only
 	const getProjectPath = (providedPath?: string): string => {
-		if (providedPath) {
-			return path.resolve(providedPath);
-		}
-		
-		// Auto-detect project path from current working directory
+		// Always use current working directory, ignore any provided path
 		const cwd = process.cwd();
-		
-		// Check if current directory already has .qdg
-		const currentQdgPath = path.join(cwd, '.qdg');
-		if (fs.existsSync(currentQdgPath)) {
-			return cwd;
-		}
-		
-		// Use current working directory as project path
+		console.log(`[QDG] Using project path: ${cwd}`);
 		return cwd;
 	};
 
