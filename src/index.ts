@@ -63,17 +63,34 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 		return `task_${timestamp}_${random}`;
 	};
 
-	// Helper function to get current working directory only
-	const getProjectPath = (providedPath?: string): string => {
-		// Always use current working directory, ignore any provided path
-		const cwd = process.cwd();
-		console.log(`[QDG] Using project path: ${cwd}`);
-		return cwd;
+	// Helper function to get project path (optional, skip file operations if not provided)
+	const getProjectPath = (providedPath?: string): string | null => {
+		if (!providedPath) {
+			console.log('[QDG] No project path provided, skipping file operations');
+			return null;
+		}
+		
+		const resolvedPath = path.resolve(providedPath);
+		console.log(`[QDG] Using project path: ${resolvedPath}`);
+		
+		// Verify the path exists and is absolute
+		if (!path.isAbsolute(resolvedPath)) {
+			throw new Error(`Project path must be absolute. Provided: ${providedPath}`);
+		}
+		
+		if (!fs.existsSync(resolvedPath)) {
+			throw new Error(`Project path does not exist: ${resolvedPath}`);
+		}
+		
+		return resolvedPath;
 	};
 
-	// Helper function to ensure .qdg directory for any tool
-	const ensureQdgDirectory = async (projectPath?: string): Promise<string> => {
+	// Helper function to ensure .qdg directory for any tool (skip if no project path)
+	const ensureQdgDirectory = async (projectPath?: string): Promise<string | null> => {
 		const resolvedPath = getProjectPath(projectPath);
+		if (!resolvedPath) {
+			return null; // Skip file operations
+		}
 		await qdgManager.initializeQdgDirectory(resolvedPath);
 		return resolvedPath;
 	};
@@ -169,12 +186,13 @@ ${prompt}
 					content: z.string(),
 					timestamp: z.number().optional()
 				})).optional().describe("Conversation history records"),
-				context: z.record(z.unknown()).optional().describe("Additional context information")
+				context: z.record(z.unknown()).optional().describe("Additional context information"),
+				projectPath: z.string().optional().describe("Optional: Absolute path to the project directory where .qdg should be created (e.g., '/home/user/my-project' or 'C:\\\\Users\\\\Username\\\\Projects\\\\MyProject'). Must be absolute path if provided. If not provided, will only return content.")
 			},
-			async ({ userMessage, conversationHistory, context }) => {
+			async ({ userMessage, conversationHistory, context, projectPath }) => {
 				try {
-					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory();
+					// Try to ensure .qdg directory if project path provided
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
 					
 					const conversation: ConversationInput = {
 						userMessage,
@@ -184,22 +202,27 @@ ${prompt}
 					
 					const prompt = taskExtractor.generateTaskAnalysisPrompt(conversation);
 					
+					let setupMessage = "";
+					if (resolvedProjectPath) {
+						setupMessage = `✅ **PROJECT SETUP**: Initialized .qdg directory at \`${resolvedProjectPath}\`\n\n`;
+					} else {
+						setupMessage = `ℹ️ **NO PROJECT PATH**: Running without file system access - content will be returned only\n\n`;
+					}
+					
 					return {
 						content: [{
 							type: "text",
 							text: `🎯 **STAGE 1 COMPLETE: Task Analysis Prompt Generated**
 
-✅ **PROJECT SETUP**: Initialized .qdg directory at \`${resolvedProjectPath}\`
-
-📋 **LLM INSTRUCTIONS - Execute Automatically:**
+${setupMessage}📋 **LLM INSTRUCTIONS - Execute Automatically:**
 
 **Step 1**: Execute the prompt below to get task analysis JSON
 **Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON (optional: set targetScore 1-10 to adjust evaluation strictness, default=8)
-**Step 3**: Call \`save_quality_dimensions\` to save the standards, then proceed with task execution
+**Step 3**: Optionally call \`save_quality_dimensions\` to save standards to file system (skip if no projectPath provided)
 
 ⚠️ **LLM**: Execute the prompt below to get JSON output, then automatically proceed to Stage 2!
 
-**🎯 Purpose**: These 3 stages help you fully understand the task and establish clear quality standards before beginning execution, ensuring higher quality results.
+**🎯 Purpose**: These stages help you fully understand the task and establish clear quality standards before beginning execution, ensuring higher quality results. File saving is optional - you can work with the generated content directly or save it for future reference.
 
 ---
 
@@ -234,12 +257,13 @@ ${prompt}
 				taskAnalysisJson: z.string().describe("Task analysis JSON result"),
 				targetScore: z.number().default(8).describe("Target score (0-10 scale, used to guide evaluation criteria strictness)"),
 				timezone: z.string().optional().describe("Timezone"),
-				locale: z.string().default("en-US").describe("Localization settings")
+				locale: z.string().default("en-US").describe("Localization settings"),
+				projectPath: z.string().optional().describe("Optional: Absolute path to the project directory where .qdg should be created (e.g., '/home/user/my-project' or 'C:\\\\Users\\\\Username\\\\Projects\\\\MyProject'). Must be absolute path if provided. If not provided, will only return content.")
 			},
-			async ({ taskAnalysisJson, targetScore, timezone, locale }) => {
+			async ({ taskAnalysisJson, targetScore, timezone, locale, projectPath }) => {
 				try {
-					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory();
+					// Try to ensure .qdg directory if project path provided
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
 					
 					// Parse task analysis result
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
@@ -262,70 +286,82 @@ ${prompt}
 					// Get time context (system will auto-detect timezone)
 					const timeContext = timeContextManager.getCurrentTimeContext(timezone, locale);
 					
-					// Check if same task file already exists
-					let existingTaskId: string | null = null;
-					try {
-						const tasksDir = path.join(resolvedProjectPath, '.qdg', 'tasks');
-						if (fs.existsSync(tasksDir)) {
-							const taskFolders = fs.readdirSync(tasksDir);
-							// Find task ID containing the same hash
-							existingTaskId = taskFolders.find((folder: string) => 
-								folder.includes(taskHash)
-							) || null;
-						}
-					} catch (error) {
-						// Ignore check errors, continue creating new task
-					}
-					
-					// Generate prompt
-					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, resolvedProjectPath, targetScore);
+					// Generate prompt (pass null instead of undefined for projectPath)
+					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, resolvedProjectPath || undefined, targetScore);
 					
 					let responseText = prompt;
 					let finalTaskId = taskId;
 					
-					// Handle .qdg directory and task records
-					try {
-						// Check if task file already exists
-						if (existingTaskId) {
-							// Use existing task ID
-							finalTaskId = existingTaskId;
-							const existingDimensionPath = path.join(resolvedProjectPath, '.qdg', 'tasks', existingTaskId, `${existingTaskId}_dimension.md`);
-							
-							responseText += `\n\n🔄 Found existing record for same task`;
-							responseText += `\n🎯 Task ID: ${existingTaskId}`;
-							responseText += `\n📁 Existing file: ${path.relative(resolvedProjectPath, existingDimensionPath)}`;
-							responseText += `\n📋 Status: Can directly use save_quality_dimensions tool to update evaluation standards`;
-						} else {
-							// Create new task directory (but don't create MD file)
-							const taskDir = path.join(resolvedProjectPath, '.qdg', 'tasks', taskId);
-							await fs.promises.mkdir(taskDir, { recursive: true });
-							
-							responseText += `\n\n✅ New task directory created!`;
-							responseText += `\n🎯 Task ID: ${taskId}`;
-							responseText += `\n📁 Task directory: ${path.relative(resolvedProjectPath, taskDir)}`;
-							responseText += `\n📋 Status: Ready to receive evaluation standards`;
+					// Handle .qdg directory and task records only if we have a project path
+					if (resolvedProjectPath) {
+						// Check if same task file already exists
+						let existingTaskId: string | null = null;
+						try {
+							const tasksDir = path.join(resolvedProjectPath, '.qdg', 'tasks');
+							if (fs.existsSync(tasksDir)) {
+								const taskFolders = fs.readdirSync(tasksDir);
+								// Find task ID containing the same hash
+								existingTaskId = taskFolders.find((folder: string) => 
+									folder.includes(taskHash)
+								) || null;
+							}
+						} catch (error) {
+							// Ignore check errors, continue creating new task
 						}
 						
-						responseText += `\n\n🎯 **TARGET SCORE GUIDANCE**: This prompt uses targetScore=${targetScore}/10 (configurable parameter)`;
-						responseText += `\n   • Higher scores (8-10): Stricter evaluation criteria, professional/enterprise standards`;
-						responseText += `\n   • Lower scores (5-7): More lenient criteria, learning/development standards`;
-						responseText += `\n   • LLM: You can adjust targetScore parameter when calling this tool to change evaluation strictness`;
-						
-						responseText += `\n\n📋 **LLM INSTRUCTIONS - Execute Automatically:**`;
-						responseText += `\n1. Execute the above prompt to generate evaluation dimensions`;
-						responseText += `\n2. You will get TWO outputs from execution:`;
-						responseText += `\n   - Refined task description (first stage output)`;
-						responseText += `\n   - Complete evaluation dimension system (second stage output)`;
+						try {
+							// Check if task file already exists
+							if (existingTaskId) {
+								// Use existing task ID
+								finalTaskId = existingTaskId;
+								const existingDimensionPath = path.join(resolvedProjectPath, '.qdg', 'tasks', existingTaskId, `${existingTaskId}_dimension.md`);
+								
+								responseText += `\n\n🔄 Found existing record for same task`;
+								responseText += `\n🎯 Task ID: ${existingTaskId}`;
+								responseText += `\n📁 Existing file: ${path.relative(resolvedProjectPath, existingDimensionPath)}`;
+								responseText += `\n📋 Status: Can directly use save_quality_dimensions tool to update evaluation standards`;
+							} else {
+								// Create new task directory (but don't create MD file)
+								const taskDir = path.join(resolvedProjectPath, '.qdg', 'tasks', taskId);
+								await fs.promises.mkdir(taskDir, { recursive: true });
+								
+								responseText += `\n\n✅ New task directory created!`;
+								responseText += `\n🎯 Task ID: ${taskId}`;
+								responseText += `\n📁 Task directory: ${path.relative(resolvedProjectPath, taskDir)}`;
+								responseText += `\n📋 Status: Ready to receive evaluation standards`;
+							}
+							
+							responseText += `\n\n✅ **Working Directory**: ${resolvedProjectPath}`;
+						} catch (initError) {
+							console.warn('Failed to initialize task directory:', initError);
+							responseText += `\n\n⚠️ Warning: Unable to create task directory, but prompt has been generated. Error: ${initError instanceof Error ? initError.message : String(initError)}`;
+						}
+					} else {
+						// No project path provided
+						responseText += `\n\n🎯 Task ID: ${taskId} (generated for reference)`;
+						responseText += `\n\nℹ️ **NO PROJECT PATH**: Running without file system access - content will be returned only`;
+					}
+					
+					responseText += `\n\n🎯 **TARGET SCORE GUIDANCE**: This prompt uses targetScore=${targetScore}/10 (configurable parameter)`;
+					responseText += `\n   • Higher scores (8-10): Stricter evaluation criteria, professional/enterprise standards`;
+					responseText += `\n   • Lower scores (5-7): More lenient criteria, learning/development standards`;
+					responseText += `\n   • LLM: You can adjust targetScore parameter when calling this tool to change evaluation strictness`;
+					
+					responseText += `\n\n📋 **LLM INSTRUCTIONS - Execute Automatically:**`;
+					responseText += `\n1. Execute the above prompt to generate evaluation dimensions`;
+					responseText += `\n2. You will get TWO outputs from execution:`;
+					responseText += `\n   - Refined task description (first stage output)`;
+					responseText += `\n   - Complete evaluation dimension system (second stage output)`;
+					if (resolvedProjectPath) {
 						responseText += `\n3. Automatically call save_quality_dimensions tool with:`;
 						responseText += `\n   - taskId: ${finalTaskId}`;
+						responseText += `\n   - projectPath: ${resolvedProjectPath}`;
 						responseText += `\n   - refinedTaskDescription: [LLM first output]`;
 						responseText += `\n   - dimensionsContent: [LLM second output]`;
-						responseText += `\n\n✅ **Working Directory**: ${resolvedProjectPath}`;
-						responseText += `\n\n**LLM**: After Stage 3, you will have complete task understanding and quality standards to guide your execution!`;
-					} catch (initError) {
-						console.warn('Failed to initialize task directory:', initError);
-						responseText += `\n\n⚠️ Warning: Unable to create task directory, but prompt has been generated. Error: ${initError instanceof Error ? initError.message : String(initError)}`;
+					} else {
+						responseText += `\n3. Use the outputs directly (no file saving required)`;
 					}
+					responseText += `\n\n**LLM**: After Stage 3, you will have complete task understanding and quality standards to guide your execution!`;
 					
 					return {
 						content: [{
@@ -336,11 +372,11 @@ ${prompt}
 
 **Step 1**: Execute the TWO-STAGE prompt below
 **Step 2**: You will get TWO outputs: (1) Refined task description + (2) Quality dimensions
-**Step 3**: Call \`save_quality_dimensions\` with BOTH outputs to complete the workflow
+${resolvedProjectPath ? "**Step 3**: Call `save_quality_dimensions` with BOTH outputs to complete the workflow" : "**Step 3**: Use the outputs directly for task execution"}
 
-⚠️ **IMPORTANT**: Please execute the prompt below and get BOTH outputs, then save them!
+⚠️ **IMPORTANT**: Please execute the prompt below and get BOTH outputs!
 
-**💡 Reminder**: After saving, you will use these quality standards to guide your task execution and achieve high scores across all evaluation dimensions.
+**💡 Reminder**: After this stage, you will use these quality standards to guide your task execution and achieve high scores across all evaluation dimensions.
 
 ---
 
@@ -348,7 +384,7 @@ ${responseText}
 
 ---
 
-🔄 **WORKFLOW STATUS**: Stage 2/3 Complete → **Next: Execute prompt above, then save results**`
+🔄 **WORKFLOW STATUS**: Stage 2/3 Complete → **Next: Execute prompt above, then optionally save results**`
 						}]
 					};
 				} catch (error) {
@@ -370,17 +406,18 @@ ${responseText}
 	if (isToolEnabled('save_quality_dimensions')) {
 		server.tool(
 			"save_quality_dimensions",
-			"Save LLM-generated task refinement and evaluation dimension standards to .qdg directory",
+			"Optional: Save LLM-generated task refinement and evaluation dimension standards to .qdg directory. Skip this step if you want to work with content directly without file system storage.",
 			{
 				taskId: z.string().describe("Task ID"),
 				refinedTaskDescription: z.string().describe("LLM-refined task description (first stage output)"),
 				dimensionsContent: z.string().describe("LLM-generated complete evaluation dimension content (second stage output)"),
-				taskAnalysisJson: z.string().optional().describe("Original task analysis JSON (optional, for basic information)")
+				taskAnalysisJson: z.string().optional().describe("Original task analysis JSON (optional, for basic information)"),
+				projectPath: z.string().optional().describe("Optional: Absolute path to the project directory where .qdg should be created (e.g., '/home/user/my-project' or 'C:\\\\Users\\\\Username\\\\Projects\\\\MyProject'). Must be absolute path if provided. If not provided, will only return content.")
 			},
-			async ({ taskId, refinedTaskDescription, dimensionsContent, taskAnalysisJson }) => {
+			async ({ taskId, refinedTaskDescription, dimensionsContent, taskAnalysisJson, projectPath }) => {
 				try {
-					// Auto-ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory();
+					// Try to ensure .qdg directory if project path provided
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
 					
 					// Parse task analysis (if provided)
 					let task: any = {};
@@ -395,20 +432,21 @@ ${responseText}
 					// Extract task name from task analysis or use fallback
 					const taskName = task.taskName || 'UnnamedTask';
 					
-					// Save using new flat file structure with LLM-generated task name
-					const outputFilePath = await qdgManager.saveFinalDimensionStandardsFlat(
-						resolvedProjectPath, 
-						taskId,
-						taskName,
-						task,
-						refinedTaskDescription,
-						dimensionsContent
-					);
-					
-					return {
-						content: [{
-							type: "text",
-							text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**
+					if (resolvedProjectPath) {
+						// Save using new flat file structure with LLM-generated task name
+						const outputFilePath = await qdgManager.saveFinalDimensionStandardsFlat(
+							resolvedProjectPath, 
+							taskId,
+							taskName,
+							task,
+							refinedTaskDescription,
+							dimensionsContent
+						);
+						
+						return {
+							content: [{
+								type: "text",
+								text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**
 
 ✅ **STAGE 3 COMPLETE**: Quality evaluation standards saved successfully!
 
@@ -440,8 +478,74 @@ ${responseText}
 💡 **Quality Standards Location**: \`${path.relative(resolvedProjectPath, outputFilePath)}\`
 
 🎯 **Remember**: The goal is to achieve high scores across all evaluation dimensions by following the detailed criteria and standards that have been established for this specific task.`
-						}]
-					};
+							}]
+						};
+					} else {
+						// No project path - return content directly
+						const completeContent = `# Quality Evaluation Standards
+
+## 📋 Task Information
+- **Task ID**: ${taskId}
+- **Task Name**: ${taskName}
+- **Creation Time**: ${new Date().toLocaleString('en-US')}
+- **Core Task**: ${task.coreTask || 'Not specified'}
+
+---
+
+## 📋 Task Refinement (First Stage Output)
+
+${refinedTaskDescription}
+
+---
+
+## ⭐ Evaluation Dimension System (Second Stage Output)
+
+${dimensionsContent}
+
+---
+
+## 📖 Usage Instructions
+
+Use these quality standards to guide your task execution and achieve high scores across all evaluation dimensions.
+
+*Generated at: ${new Date().toISOString()}*
+`;
+						
+						return {
+							content: [{
+								type: "text",
+								text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**
+
+✅ **STAGE 3 COMPLETE**: Quality evaluation standards generated successfully!
+
+📊 **Final Results:**
+🎯 Task ID: ${taskId}
+📝 Task Name: ${taskName}
+ℹ️ **NO FILE SAVED**: Running without file system access
+
+🔄 **WORKFLOW STATUS**: ✅ Stage 1/3 ✅ Stage 2/3 ✅ Stage 3/3 → **COMPLETED**
+
+---
+
+📋 **COMPLETE QUALITY STANDARDS CONTENT:**
+
+${completeContent}
+
+---
+
+🚀 **READY FOR EXECUTION - LLM Instructions:**
+
+**LLM: You now have complete task understanding and quality standards. Begin execution with:**
+
+1. **📋 Task Reference**: Use the refined task description above as your guide
+2. **⭐ Quality Standards**: Follow the evaluation dimensions and scoring criteria precisely  
+3. **🎯 Target Score**: Aim for the target score level defined in the standards
+4. **💪 Execution Goal**: Work systematically to meet or exceed each dimension's requirements
+
+🎯 **Remember**: The goal is to achieve high scores across all evaluation dimensions by following the detailed criteria and standards shown above.`
+							}]
+						};
+					}
 				} catch (error) {
 					return {
 						content: [{

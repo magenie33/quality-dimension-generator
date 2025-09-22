@@ -37,3 +37,7 @@ Thumbs.db
 
 # QDG
 .qdg/
+
+# TMP
+tmp/
+temp/
