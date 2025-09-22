@@ -1,9 +1,8 @@
-import { EvaluationDimension, TaskAnalysis, TimeContext } from './types.js';
+import { TaskAnalysis, TimeContext, QualityDimensionsResponse, QualityDimension, validateQualityDimensions } from './types.js';
 
 /**
  * Quality Evaluation Dimension Generator
- * Supports configurable dimension count and expected score, each dimension can be scored 0-10 with any number, final score is average
- * Note: 3-tier guidelines (6, 8, 10 points) are for guidance only, actual scoring can be any number 0-10
+ * Supports configurable dimension count and expected score
  */
 export class QualityDimensionGenerator {
 	private dimensionCount: number;
@@ -15,21 +14,17 @@ export class QualityDimensionGenerator {
 	}
 	
 	/**
-	 * Generate dimension scoring prompt, supports configurable dimension count and expected score
+	 * Generate dimension scoring prompt using configured dimension count and expected score
 	 */
 	public async generateDimensionsPrompt(
 		task: TaskAnalysis,
-		timeContext: TimeContext,
-		projectPath?: string,
-		targetScore?: number
+		timeContext: TimeContext
 	): Promise<string> {
-		// Use instance configuration or provided target score
+		// Use instance configuration
 		const dimensionCount = this.dimensionCount;
-		const expectedScore = targetScore ?? this.expectedScore;
+		const expectedScore = this.expectedScore;
 
-		return `🎯 **Important Note: Please strictly follow the format to ensure proper parsing and saving by subsequent programs!**
-
-Based on the following task information, generate complete scoring standards for ${dimensionCount} evaluation dimensions:
+		return `Please analyze the following task and generate ${dimensionCount} evaluation dimensions in JSON format:
 
 ## 📋 Task Information
 - **Core Task**: ${task.coreTask}
@@ -45,173 +40,149 @@ Based on the following task information, generate complete scoring standards for
 
 ## 🎯 Quality Target
 - **Expected Score**: ${expectedScore}/10 points
-- **Scoring Strictness**: ${expectedScore >= 8 ? 'High Standard (Strict Evaluation)' : expectedScore >= 6 ? 'Medium Standard (Moderate Evaluation)' : 'Basic Standard (Lenient Evaluation)'}
-- **Quality Requirements**: ${expectedScore >= 8 ? 'Pursue excellence, perfect details' : expectedScore >= 6 ? 'Good quality, main functions complete' : 'Basically usable, meet basic needs'}
+- **Total Score Calculation**: Average of all ${dimensionCount} dimension scores
 
----
+Please analyze according to the following requirements and output the result in JSON format:
 
-## ⚡ **Format Requirements (Please strictly follow)**
+\`\`\`json
+{
+  "dimensions": [
+    {
+      "name": "Dimension name (3-15 characters, specific and clear)",
+      "description": "One sentence description of what this dimension evaluates",
+      "importance": "One sentence explaining why this dimension is critical for the task",
+      "scoring": {
+        "10": "Specific criteria for excellent performance (measurable and actionable)",
+        "8": "Specific criteria for good performance (measurable and actionable)", 
+        "6": "Specific criteria for acceptable performance (measurable and actionable)"
+      }
+    },
+    {
+      "name": "Second dimension name",
+      "description": "Description of second dimension",
+      "importance": "Why this dimension matters",
+      "scoring": {
+        "10": "Excellent criteria for dimension 2",
+        "8": "Good criteria for dimension 2",
+        "6": "Acceptable criteria for dimension 2"
+      }
+    }
+    // ... continue for all ${dimensionCount} dimensions
+  ]
+}
+\`\`\`
 
-**Must output in the following precise format, each dimension includes title, description, importance, and scoring guidance:**
+## ✅ Analysis Requirements
+1. **Dimension Count**: Generate exactly ${dimensionCount} dimensions that comprehensively cover the task
+2. **Dimension Names**: Use concise, professional names (3-15 characters) that clearly indicate what is being evaluated
+3. **Descriptions**: One clear sentence explaining the scope of each dimension's evaluation
+4. **Importance**: Explain why each dimension is essential for achieving task success
+5. **Scoring Criteria**: Each score level (6, 8, 10) must have specific, measurable, actionable criteria
+6. **Quality Standards**: Design criteria so that achieving an average of ${expectedScore}/10 across all dimensions represents realistic excellence for this task
+7. **Domain Relevance**: All dimensions must be appropriate for the "${task.domain}" domain
+8. **Comprehensive Coverage**: The ${dimensionCount} dimensions together should evaluate all critical aspects of the task
 
-### Dimension 1: [Specific Dimension Name] (0-10 points)
-**Description**: [Concise and clear dimension explanation, summarize evaluation scope in one sentence]
-**Importance**: [One sentence explaining why this dimension is important]
-**Scoring Guidance**:
-- **10 points**: [Specific and clear excellence standard, actionable and measurable]
-- **8 points**: [Specific and clear good standard, actionable and measurable]
-- **6 points**: [Specific and clear passing standard, actionable and measurable]
+## ⚠️ JSON Format Requirements
+- Ensure valid JSON syntax with proper quotes and commas
+- Each dimension object must include all 4 fields: name, description, importance, scoring
+- Scoring object must have exactly 3 levels: "6", "8", "10"
+- All text should be professional and specific to the task domain
+- Generate complete and valid JSON that can be directly parsed
 
-### Dimension 2: [Specific Dimension Name] (0-10 points)
-**Description**: [Concise and clear dimension explanation, summarize evaluation scope in one sentence]
-**Importance**: [One sentence explaining why this dimension is important]
-**Scoring Guidance**:
-- **10 points**: [Specific and clear excellence standard, actionable and measurable]
-- **8 points**: [Specific and clear good standard, actionable and measurable]
-- **6 points**: [Specific and clear passing standard, actionable and measurable]
+## 🎯 Final Reminder
+Generate exactly ${dimensionCount} complete dimensions that together provide a comprehensive evaluation framework for: "${task.coreTask}"
 
-**[Continue generating ${dimensionCount} dimensions, strictly following the above format]**
+**Important**: Each dimension must include all 4 required fields (name, description, importance, scoring with 6/8/10 levels).
 
----
+Please ensure the JSON is complete, valid, and directly usable for evaluation purposes.`;
+	}
+	
+	/**
+	 * Parse and validate LLM-returned quality dimensions result
+	 */
+	public parseQualityDimensionsResult(llmResponse: string): QualityDimensionsResponse {
+		// Extract JSON part
+		const jsonMatch = llmResponse.match(/```json\s*([\s\S]*?)\s*```/);
+		if (!jsonMatch) {
+			throw new Error('JSON format quality dimensions result not found');
+		}
 
-## ✅ **Quality Requirements**
-1. **Consistent Format**: Each dimension must include title, description, importance, scoring guidance
-2. **Specific Standards**: Each scoring guidance should be specific and actionable, avoid vague expressions
-3. **Comprehensive Coverage**: ${dimensionCount} dimensions should cover all key aspects of the task
-4. **Professional**: Meet professional standards in the ${task.domain} domain
-5. **Target Matching**: Scoring standard strictness matches expected score ${expectedScore}/10 points
+		// Validate JSON format and structure
+		const validation = validateQualityDimensions(jsonMatch[1], this.dimensionCount);
+		if (!validation.isValid) {
+			throw new Error(`Quality dimensions validation failed:\n${validation.errors.join('\n')}`);
+		}
 
-## ⚠️ **Key Notes**
-- **Strict Format**: Must use "### Dimension X:" as beginning, "**Description**:", "**Importance**:", "**Scoring Guidance**:" labels
-- **Complete Output**: Must generate complete ${dimensionCount} dimensions, cannot omit any
-- **Clear Standards**: 10, 8, 6 point standards should have obvious differences for easy scoring
-- **Strong Practicality**: Generated standards should be convenient for actual use and scoring
-
-🚀 **Please now start generating ${dimensionCount} evaluation dimensions!**`;
+		return validation.data as QualityDimensionsResponse;
 	}
 
 	/**
-	 * Create dimension template, supports configurable count
+	 * Parse and validate LLM-returned quality dimensions result
 	 */
-	public createDimensions(dimensionCount: number = 5): EvaluationDimension[] {
-		return Array.from({ length: dimensionCount }, (_, index) => ({
-			name: `Dimension ${index + 1}`,
-			weight: 1 / dimensionCount, // Dynamically calculate weight
-			description: 'Detailed description to be generated by LLM',
-			criteria: [
-				'10 points: Excellent performance',
-				'8 points: Good performance',
-				'6 points: Passing performance'
-			],
-			evaluationMethod: '0-10 point scoring (can be any number)',
-			importance: 'Importance explanation to be generated by LLM'
-		}));
-	}
+	public parseDimensionsResult(llmResponse: string): QualityDimensionsResponse {
+		// Extract JSON part
+		const jsonMatch = llmResponse.match(/```json\s*([\s\S]*?)\s*```/);
+		if (!jsonMatch) {
+			throw new Error('JSON format dimensions result not found');
+		}
 
-	/**
-	 * Parse LLM-generated dimension scoring text (3-tier guidance)
-	 */
-	public parseDimensionsFromText(dimensionsText: string, dimensionCount: number = 5): EvaluationDimension[] {
-		const dimensions: EvaluationDimension[] = [];
+		const result = JSON.parse(jsonMatch[1]);
 		
-		// Split text by dimensions
-		const dimensionBlocks = dimensionsText.split(/### Dimension \d+：/).slice(1);
-		if (dimensionBlocks.length === 0) {
-			// Try alternative patterns
-			const altBlocks = dimensionsText.split(/### \d+\./).slice(1);
-			dimensionBlocks.push(...altBlocks);
+		// Validate root structure
+		if (!result.dimensions || !Array.isArray(result.dimensions)) {
+			throw new Error('Invalid structure: missing or invalid dimensions array');
 		}
 
-		for (let i = 0; i < Math.min(dimensionBlocks.length, dimensionCount); i++) {
-			const block = dimensionBlocks[i].trim();
-			const lines = block.split('\n').map(line => line.trim()).filter(line => line);
-			
-			// Parse dimension information
-			const dimension: EvaluationDimension = {
-				name: '',
-				weight: 1 / dimensionCount,
-				description: '',
-				criteria: [],
-				evaluationMethod: '0-10 point scoring (can be any number)',
-				importance: ''
-			};
-
-			// Parse dimension name
-			const firstLine = lines[0] || '';
-			const nameMatch = firstLine.match(/^(.+?)\s*\(0-10\s*points?\)/);
-			if (nameMatch) {
-				dimension.name = nameMatch[1].trim();
-			}
-
-			// Parse description and importance
-			for (const line of lines) {
-				if (line.startsWith('**Description**:')) {
-					dimension.description = line.substring(16).trim();
-				} else if (line.startsWith('**Importance**:')) {
-					dimension.importance = line.substring(15).trim();
-				}
-			}
-
-			// Parse scoring guidance (3 tiers: 6, 8, 10 points)
-			const criteria: string[] = [];
-			const tenPointMatch = block.match(/- \*\*10 points?\*\*[：:](.+?)$/m);
-			const eightPointMatch = block.match(/- \*\*8 points?\*\*[：:](.+?)$/m);
-			const sixPointMatch = block.match(/- \*\*6 points?\*\*[：:](.+?)$/m);
-
-			if (tenPointMatch) criteria.push(`10 points: ${tenPointMatch[1].trim()}`);
-			if (eightPointMatch) criteria.push(`8 points: ${eightPointMatch[1].trim()}`);
-			if (sixPointMatch) criteria.push(`6 points: ${sixPointMatch[1].trim()}`);
-
-			dimension.criteria = criteria.length > 0 ? criteria : [
-				'10 points: Excellent performance',
-				'8 points: Good performance',
-				'6 points: Passing performance'
-			];
-
-			// Set default name
-			if (!dimension.name) {
-				dimension.name = `Dimension ${i + 1}`;
-			}
-
-			dimensions.push(dimension);
+		// Validate dimension count
+		if (result.dimensions.length !== this.dimensionCount) {
+			throw new Error(`Expected ${this.dimensionCount} dimensions, got ${result.dimensions.length}`);
 		}
 
-		// Ensure specified number of dimensions
-		while (dimensions.length < dimensionCount) {
-			const defaultDimension = this.createDimensions(1)[0];
-			defaultDimension.name = `Dimension ${dimensions.length + 1}`;
-			defaultDimension.weight = 1 / dimensionCount;
-			dimensions.push(defaultDimension);
-		}
-
-		return dimensions.slice(0, dimensionCount);
-	}
-
-	/**
-	 * Generate scoring table (supports configurable dimension count)
-	 */
-	public generateScoringTable(dimensions: EvaluationDimension[]): string {
-		const dimensionCount = dimensions.length;
-		let table = `# Scoring Standards Table (Total 10 points, ${dimensionCount} dimensions with equal weight)\n\n`;
-		
-		dimensions.forEach((dimension, dimIndex) => {
-			table += `## ${dimIndex + 1}. ${dimension.name} (0-10 points)\n`;
-			table += `**Description**: ${dimension.description}\n`;
-			table += `**Scoring Guidance**:\n`;
-			dimension.criteria.forEach((criterion: string) => {
-				table += `- ${criterion}\n`;
-			});
-			table += `**Score**: __/10 points (can be any number, like 7.5 points)\n\n`;
+		// Validate each dimension
+		result.dimensions.forEach((dimension: any, index: number) => {
+			this.validateDimension(dimension, index);
 		});
 
-		table += `## Total Score Calculation\n`;
-		table += `| Dimension | Score | Note |\n`;
-		table += `|-----------|-------|------|\n`;
-		dimensions.forEach((dimension, index) => {
-			table += `| ${dimension.name} | __/10 points | Can be any number |\n`;
-		});
-		table += `| **Average Score** | **__/10 points** | **Average of all dimensions** |\n`;
+		return {
+			dimensions: result.dimensions as QualityDimension[]
+		};
+	}
 
-		return table;
+	/**
+	 * Validate a single dimension object
+	 */
+	private validateDimension(dimension: any, index: number): void {
+		const requiredFields = ['name', 'description', 'importance', 'scoring'];
+		
+		// Check required fields
+		for (const field of requiredFields) {
+			if (!dimension[field]) {
+				throw new Error(`Dimension ${index + 1}: missing required field '${field}'`);
+			}
+		}
+
+		// Validate name length
+		if (dimension.name.length < 3 || dimension.name.length > 15) {
+			throw new Error(`Dimension ${index + 1}: name should be 3-15 characters, got ${dimension.name.length}`);
+		}
+
+		// Validate scoring structure
+		if (!dimension.scoring || typeof dimension.scoring !== 'object') {
+			throw new Error(`Dimension ${index + 1}: invalid scoring object`);
+		}
+
+		const requiredScores = ['6', '8', '10'];
+		for (const score of requiredScores) {
+			if (!dimension.scoring[score] || typeof dimension.scoring[score] !== 'string') {
+				throw new Error(`Dimension ${index + 1}: missing or invalid scoring criteria for level ${score}`);
+			}
+		}
+
+		// Check for extra scoring levels
+		const actualScores = Object.keys(dimension.scoring);
+		const extraScores = actualScores.filter(score => !requiredScores.includes(score));
+		if (extraScores.length > 0) {
+			throw new Error(`Dimension ${index + 1}: unexpected scoring levels: ${extraScores.join(', ')}`);
+		}
 	}
 }

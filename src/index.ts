@@ -9,7 +9,8 @@ import * as crypto from 'crypto';
 import { 
 	TaskAnalysis,
 	TimeContext,
-	ConversationInput
+	ConversationInput,
+	validateTaskAnalysis
 } from './lib/types.js';
 import { TaskExtractor } from './lib/taskExtractor.js';
 import { TimeContextManager } from './lib/timeContextManager.js';
@@ -270,15 +271,17 @@ ${prompt}
 	if (isToolEnabled('generate_quality_dimensions_prompt')) {
 		server.tool(
 			"generate_quality_dimensions_prompt",
-			"Generate quality dimensions prompt and create task records. targetScore is required to set evaluation strictness: higher scores create stricter professional standards, lower scores create more lenient learning-focused criteria.",
+			"Generate quality dimensions prompt based on task analysis. Uses default target score from configuration or task complexity to determine evaluation strictness.",
 			{
-				taskAnalysisJson: z.string().describe("Task analysis JSON result"),
-				targetScore: z.number().describe("REQUIRED: Target score (0-10 scale, used to guide evaluation criteria strictness). Higher scores (8-10) = stricter standards, Lower scores (5-7) = more lenient standards")
+				taskAnalysisJson: z.string().describe("Task analysis JSON result")
 			},
-			async ({ taskAnalysisJson, targetScore }) => {
+			async ({ taskAnalysisJson }) => {
 				try {
-					// Parse task analysis result
+					// Parse task analysis JSON (already validated in stage 1)
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
+					
+					// Use default expected score from configuration
+					const targetScore = finalConfig.expectedScore;
 					
 					// Generate stable task ID based on task content (same task content = same ID)
 					const taskHash = crypto.createHash('md5')
@@ -298,8 +301,8 @@ ${prompt}
 					// Get time context (use system defaults)
 					const timeContext = timeContextManager.getCurrentTimeContext();
 					
-					// Generate prompt (no project path for this step)
-					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, undefined, targetScore);
+					
+					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext);
 					
 					return {
 						content: [{
