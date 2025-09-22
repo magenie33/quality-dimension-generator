@@ -63,7 +63,31 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 		return `task_${timestamp}_${random}`;
 	};
 
-	// Helper function to discover projects with .qdg directories
+	// Helper function to auto-detect or use provided project path
+	const getProjectPath = (providedPath?: string): string => {
+		if (providedPath) {
+			return path.resolve(providedPath);
+		}
+		
+		// Auto-detect project path from current working directory
+		const cwd = process.cwd();
+		
+		// Check if current directory already has .qdg
+		const currentQdgPath = path.join(cwd, '.qdg');
+		if (fs.existsSync(currentQdgPath)) {
+			return cwd;
+		}
+		
+		// Use current working directory as project path
+		return cwd;
+	};
+
+	// Helper function to ensure .qdg directory for any tool
+	const ensureQdgDirectory = async (projectPath?: string): Promise<string> => {
+		const resolvedPath = getProjectPath(projectPath);
+		await qdgManager.initializeQdgDirectory(resolvedPath);
+		return resolvedPath;
+	};
 	const discoverQdgProjects = (): Array<{qdgPath: string, projectPath: string}> => {
 		const env = process.env;
 		const discoveredProjects: Array<{qdgPath: string, projectPath: string}> = [];
@@ -187,10 +211,14 @@ ${prompt}
 					content: z.string(),
 					timestamp: z.number().optional()
 				})).optional().describe("Conversation history records"),
-				context: z.record(z.unknown()).optional().describe("Additional context information")
+				context: z.record(z.unknown()).optional().describe("Additional context information"),
+				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)")
 			},
-			async ({ userMessage, conversationHistory, context }) => {
+			async ({ userMessage, conversationHistory, context, projectPath }) => {
 				try {
+					// Auto-ensure .qdg directory
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
+					
 					const conversation: ConversationInput = {
 						userMessage,
 						conversationHistory,
@@ -204,17 +232,21 @@ ${prompt}
 							type: "text",
 							text: `🎯 **STAGE 1 COMPLETE: Task Analysis Prompt Generated**
 
-📋 **NEXT STEPS TO COMPLETE THE WORKFLOW:**
+✅ **PROJECT SETUP**: Initialized .qdg directory at \`${resolvedProjectPath}\`
 
-**Step 1**: Copy the prompt below and send it to the LLM to get task analysis JSON
-**Step 2**: Once you receive the JSON result, call \`generate_quality_dimensions_prompt\` with the JSON
-**Step 3**: After getting dimension standards, call \`save_quality_dimensions\` to save the final result
+📋 **LLM INSTRUCTIONS - Execute Automatically:**
 
-⚠️ **IMPORTANT**: You must execute the prompt below to get JSON output, then proceed to Stage 2!
+**Step 1**: Execute the prompt below to get task analysis JSON
+**Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON (optional: set targetScore 1-10 to adjust evaluation strictness, default=8)
+**Step 3**: Call \`save_quality_dimensions\` to save the standards, then proceed with task execution
+
+⚠️ **LLM**: Execute the prompt below to get JSON output, then automatically proceed to Stage 2!
+
+**🎯 Purpose**: These 3 stages help you fully understand the task and establish clear quality standards before beginning execution, ensuring higher quality results.
 
 ---
 
-## 📝 Task Analysis Prompt (Send this to LLM):
+## 📝 Task Analysis Prompt:
 
 ${prompt}
 
@@ -240,16 +272,19 @@ ${prompt}
 	if (isToolEnabled('generate_quality_dimensions_prompt')) {
 		server.tool(
 			"generate_quality_dimensions_prompt",
-			"Generate quality dimensions prompt and create task records",
+			"Generate quality dimensions prompt and create task records. Use targetScore (8 default) to set evaluation strictness: higher scores create stricter professional standards, lower scores create more lenient learning-focused criteria.",
 			{
 				taskAnalysisJson: z.string().describe("Task analysis JSON result"),
 				targetScore: z.number().default(8).describe("Target score (0-10 scale, used to guide evaluation criteria strictness)"),
 				timezone: z.string().optional().describe("Timezone"),
 				locale: z.string().default("en-US").describe("Localization settings"),
-				projectPath: z.string().optional().describe("Project path (optional, for saving task records)")
+				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)")
 			},
 			async ({ taskAnalysisJson, targetScore, timezone, locale, projectPath }) => {
 				try {
+					// Auto-ensure .qdg directory
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
+					
 					// Parse task analysis result
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
 					
@@ -273,74 +308,91 @@ ${prompt}
 					
 					// Check if same task file already exists
 					let existingTaskId: string | null = null;
-					if (projectPath) {
-						try {
-							const tasksDir = path.join(projectPath, '.qdg', 'tasks');
-							if (fs.existsSync(tasksDir)) {
-								const taskFolders = fs.readdirSync(tasksDir);
-								// Find task ID containing the same hash
-								existingTaskId = taskFolders.find((folder: string) => 
-									folder.includes(taskHash)
-								) || null;
-							}
-						} catch (error) {
-							// Ignore check errors, continue creating new task
+					try {
+						const tasksDir = path.join(resolvedProjectPath, '.qdg', 'tasks');
+						if (fs.existsSync(tasksDir)) {
+							const taskFolders = fs.readdirSync(tasksDir);
+							// Find task ID containing the same hash
+							existingTaskId = taskFolders.find((folder: string) => 
+								folder.includes(taskHash)
+							) || null;
 						}
+					} catch (error) {
+						// Ignore check errors, continue creating new task
 					}
 					
 					// Generate prompt
-					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, projectPath, targetScore);
+					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, resolvedProjectPath, targetScore);
 					
 					let responseText = prompt;
 					let finalTaskId = taskId;
 					
-					// If project path provided, handle .qdg directory and task records
-					if (projectPath) {
-						try {
-							// 1. Initialize .qdg directory
-							await qdgManager.initializeQdgDirectory(projectPath);
+					// Handle .qdg directory and task records
+					try {
+						// Check if task file already exists
+						if (existingTaskId) {
+							// Use existing task ID
+							finalTaskId = existingTaskId;
+							const existingDimensionPath = path.join(resolvedProjectPath, '.qdg', 'tasks', existingTaskId, `${existingTaskId}_dimension.md`);
 							
-							// 2. Check if task file already exists
-							if (existingTaskId) {
-								// Use existing task ID
-								finalTaskId = existingTaskId;
-								const existingDimensionPath = path.join(projectPath, '.qdg', 'tasks', existingTaskId, `${existingTaskId}_dimension.md`);
-								
-								responseText += `\n\n🔄 Found existing record for same task`;
-								responseText += `\n🎯 Task ID: ${existingTaskId}`;
-							responseText += `\n📁 Existing file: ${path.relative(projectPath, existingDimensionPath)}`;
-							responseText += `\n📋 Status: Can directly use save_quality_dimensions tool to update evaluation standards`;							} else {
-								// Create new task directory (but don't create MD file)
-								const taskDir = path.join(projectPath, '.qdg', 'tasks', taskId);
-								await fs.promises.mkdir(taskDir, { recursive: true });
-								
-								responseText += `\n\n✅ New task directory created!`;
-								responseText += `\n🎯 Task ID: ${taskId}`;
-								responseText += `\n📁 Task directory: ${path.relative(projectPath, taskDir)}`;
-								responseText += `\n📋 Status: Ready to receive evaluation standards`;
-							}
+							responseText += `\n\n🔄 Found existing record for same task`;
+							responseText += `\n🎯 Task ID: ${existingTaskId}`;
+							responseText += `\n📁 Existing file: ${path.relative(resolvedProjectPath, existingDimensionPath)}`;
+							responseText += `\n📋 Status: Can directly use save_quality_dimensions tool to update evaluation standards`;
+						} else {
+							// Create new task directory (but don't create MD file)
+							const taskDir = path.join(resolvedProjectPath, '.qdg', 'tasks', taskId);
+							await fs.promises.mkdir(taskDir, { recursive: true });
 							
-						responseText += `\n\n📋 Next Steps:`;
-						responseText += `\n1. Copy the above prompt to LLM to generate evaluation dimensions`;
-						responseText += `\n2. Copy LLM's two output parts:`;
+							responseText += `\n\n✅ New task directory created!`;
+							responseText += `\n🎯 Task ID: ${taskId}`;
+							responseText += `\n📁 Task directory: ${path.relative(resolvedProjectPath, taskDir)}`;
+							responseText += `\n📋 Status: Ready to receive evaluation standards`;
+						}
+						
+						responseText += `\n\n🎯 **TARGET SCORE GUIDANCE**: This prompt uses targetScore=${targetScore}/10 (configurable parameter)`;
+						responseText += `\n   • Higher scores (8-10): Stricter evaluation criteria, professional/enterprise standards`;
+						responseText += `\n   • Lower scores (5-7): More lenient criteria, learning/development standards`;
+						responseText += `\n   • LLM: You can adjust targetScore parameter when calling this tool to change evaluation strictness`;
+						
+						responseText += `\n\n📋 **LLM INSTRUCTIONS - Execute Automatically:**`;
+						responseText += `\n1. Execute the above prompt to generate evaluation dimensions`;
+						responseText += `\n2. You will get TWO outputs from execution:`;
 						responseText += `\n   - Refined task description (first stage output)`;
 						responseText += `\n   - Complete evaluation dimension system (second stage output)`;
-						responseText += `\n3. Use save_quality_dimensions tool to save:`;
+						responseText += `\n3. Automatically call save_quality_dimensions tool with:`;
 						responseText += `\n   - taskId: ${finalTaskId}`;
-						responseText += `\n   - projectPath: ${projectPath}`;
+						responseText += `\n   - projectPath: ${resolvedProjectPath}`;
 						responseText += `\n   - refinedTaskDescription: [LLM first output]`;
-						responseText += `\n   - dimensionsContent: [LLM second output]`;						} catch (initError) {
-							console.warn('Failed to initialize .qdg directory:', initError);
-							responseText += `\n\n⚠️ Warning: Unable to create task directory, but prompt has been generated. Error: ${initError instanceof Error ? initError.message : String(initError)}`;
-						}
-					} else {
-						responseText += `\n\n⚠️ Project path not provided, unable to establish .qdg directory. Please provide projectPath parameter to enable full functionality.`;
+						responseText += `\n   - dimensionsContent: [LLM second output]`;
+						responseText += `\n\n**LLM**: After Stage 3, you will have complete task understanding and quality standards to guide your execution!`;
+					} catch (initError) {
+						console.warn('Failed to initialize task directory:', initError);
+						responseText += `\n\n⚠️ Warning: Unable to create task directory, but prompt has been generated. Error: ${initError instanceof Error ? initError.message : String(initError)}`;
 					}
 					
 					return {
 						content: [{
 							type: "text",
-							text: `🎯 **STAGE 2 COMPLETE: Quality Dimensions Prompt Generated**\n\n📋 **CRITICAL NEXT STEPS:**\n\n**Step 1**: Copy the TWO-STAGE prompt below and send it to the LLM\n**Step 2**: LLM will provide TWO outputs: (1) Refined task description + (2) Quality dimensions\n**Step 3**: Call \`save_quality_dimensions\` with BOTH outputs to complete the workflow\n\n⚠️ **IMPORTANT**: You MUST execute the prompt below and get BOTH LLM outputs, then save them!\n\n---\n\n${responseText}\n\n---\n\n🔄 **WORKFLOW STATUS**: Stage 2/3 Complete → **Next: Execute prompt above, then save results**`
+							text: `🎯 **STAGE 2 COMPLETE: Quality Dimensions Prompt Generated**
+
+📋 **CRITICAL NEXT STEPS:**
+
+**Step 1**: Execute the TWO-STAGE prompt below
+**Step 2**: You will get TWO outputs: (1) Refined task description + (2) Quality dimensions
+**Step 3**: Call \`save_quality_dimensions\` with BOTH outputs to complete the workflow
+
+⚠️ **IMPORTANT**: Please execute the prompt below and get BOTH outputs, then save them!
+
+**💡 Reminder**: After saving, you will use these quality standards to guide your task execution and achieve high scores across all evaluation dimensions.
+
+---
+
+${responseText}
+
+---
+
+🔄 **WORKFLOW STATUS**: Stage 2/3 Complete → **Next: Execute prompt above, then save results**`
 						}]
 					};
 				} catch (error) {
@@ -356,37 +408,7 @@ ${prompt}
 		);
 	}
 
-	// Register: Get Current Time Context
-	if (isToolEnabled('get_current_time_context')) {
-		server.tool(
-			"get_current_time_context",
-			"Get current basic time context information",
-			{
-				timezone: z.string().optional().describe("Timezone"),
-				locale: z.string().default("en-US").describe("Localization settings")
-			},
-			async ({ timezone, locale }) => {
-				try {
-					const timeContext = timeContextManager.getCurrentTimeContext(timezone, locale);
 
-					return {
-						content: [{
-							type: "text",
-							text: JSON.stringify(timeContext, null, 2)
-						}]
-					};
-				} catch (error) {
-					return {
-						content: [{
-							type: "text",
-							text: `Error: ${error instanceof Error ? error.message : String(error)}`
-						}],
-						isError: true
-					};
-				}
-			}
-		);
-	}
 
 	// Register: Save Quality Dimensions
 	if (isToolEnabled('save_quality_dimensions')) {
@@ -395,15 +417,15 @@ ${prompt}
 			"Save LLM-generated task refinement and evaluation dimension standards to .qdg directory",
 			{
 				taskId: z.string().describe("Task ID"),
-				projectPath: z.string().describe("Project path"),
+				projectPath: z.string().optional().describe("Project path (optional, will auto-detect if not provided)"),
 				refinedTaskDescription: z.string().describe("LLM-refined task description (first stage output)"),
 				dimensionsContent: z.string().describe("LLM-generated complete evaluation dimension content (second stage output)"),
 				taskAnalysisJson: z.string().optional().describe("Original task analysis JSON (optional, for basic information)")
 			},
 			async ({ taskId, projectPath, refinedTaskDescription, dimensionsContent, taskAnalysisJson }) => {
 				try {
-					// Ensure .qdg directory exists
-					await qdgManager.initializeQdgDirectory(projectPath);
+					// Auto-ensure .qdg directory
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
 					
 					// Parse task analysis (if provided)
 					let task: any = {};
@@ -420,7 +442,7 @@ ${prompt}
 					
 					// Save using new flat file structure with LLM-generated task name
 					const outputFilePath = await qdgManager.saveFinalDimensionStandardsFlat(
-						projectPath, 
+						resolvedProjectPath, 
 						taskId,
 						taskName,
 						task,
@@ -431,7 +453,38 @@ ${prompt}
 					return {
 						content: [{
 							type: "text",
-							text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**\n\n✅ **STAGE 3 COMPLETE**: Quality evaluation standards saved successfully!\n\n📊 **Final Results:**\n🎯 Task ID: ${taskId}\n📝 Task Name: ${taskName}\n📁 Saved file: ${path.relative(projectPath, outputFilePath)}\n📋 File Structure: Flat file system with semantic naming\n\n🔄 **WORKFLOW STATUS**: ✅ Stage 1/3 ✅ Stage 2/3 ✅ Stage 3/3 → **COMPLETED**\n\n🚀 **READY FOR EXECUTION**: You can now start executing the task and evaluate according to the saved standards after completion!\n\n💡 **Quality Standards Location**: Check the saved markdown file for detailed evaluation criteria and scoring guidelines.`
+							text: `🎉 **COMPLETE WORKFLOW SUCCESS: All 3 Stages Finished!**
+
+✅ **STAGE 3 COMPLETE**: Quality evaluation standards saved successfully!
+
+📊 **Final Results:**
+🎯 Task ID: ${taskId}
+📝 Task Name: ${taskName}
+📁 Saved file: ${path.relative(resolvedProjectPath, outputFilePath)}
+📋 File Structure: Flat file system with semantic naming
+
+🔄 **WORKFLOW STATUS**: ✅ Stage 1/3 ✅ Stage 2/3 ✅ Stage 3/3 → **COMPLETED**
+
+---
+
+🚀 **READY FOR EXECUTION - LLM Instructions:**
+
+**LLM: You now have complete task understanding and quality standards. Begin execution with:**
+
+1. **📋 Task Reference**: Use the refined task description from the saved file as your guide
+2. **⭐ Quality Standards**: Follow the evaluation dimensions and scoring criteria precisely  
+3. **🎯 Target Score**: Aim for the target score level defined in the standards
+4. **💪 Execution Goal**: Work systematically to meet or exceed each dimension's requirements
+
+**🔍 LLM: After Task Completion:**
+- Evaluate your completed work against the saved quality standards to ensure excellence
+- Request scoring for each dimension (0-10 points)
+- Get specific feedback and improvement suggestions
+- Use the evaluation results to refine your work if needed
+
+💡 **Quality Standards Location**: \`${path.relative(resolvedProjectPath, outputFilePath)}\`
+
+🎯 **Remember**: The goal is to achieve high scores across all evaluation dimensions by following the detailed criteria and standards that have been established for this specific task.`
 						}]
 					};
 				} catch (error) {
@@ -447,100 +500,7 @@ ${prompt}
 		);
 	}
 
-	// Register: Diagnose Working Directory
-	if (isToolEnabled('diagnose_working_directory')) {
-		server.tool(
-			"diagnose_working_directory",
-			"Diagnose current working directory and MCP server runtime environment, help solve path-related issues",
-			{},
-			async () => {
-				try {
-					const cwd = process.cwd();
-					const env = process.env;
-					
-					// Use the helper function to discover projects
-					const discoveredProjects = discoverQdgProjects();
-					
-					const diagnosticInfo = `# MCP Server Environment Diagnosis
 
-## 🔍 Current Runtime Environment
-- **Current Working Directory**: ${cwd}
-- **Username**: ${env.USERNAME || 'Unknown'}
-- **User Home Directory**: ${env.USERPROFILE || env.HOME || 'Unknown'}
-- **Node.js Version**: ${process.version}
-- **Platform**: ${process.platform}
-
-## 📁 Discovered .qdg Directories
-${discoveredProjects.length > 0 ? discoveredProjects.map(project => `- 📁 ${project.qdgPath} (Project: ${project.projectPath})`).join('\n') : '❌ No .qdg directories found'}
-
-## ⚠️ Problem Analysis
-Current working directory is \`${cwd}\`, this usually means:
-1. **MCP Server Launch Location**: Server may be started from user home directory
-2. **Client Configuration Issue**: VS Code or Claude Desktop may not have correctly set working directory
-3. **Process Inheritance**: Child process inherited incorrect working directory
-
-## 💡 Solutions
-
-### Solution 1: Set Environment Variables
-Add environment variables in MCP configuration:
-\`\`\`json
-{
-  "mcpServers": {
-    "quality-dimension-generator": {
-      "command": "node",
-      "args": ["path/to/server"],
-      "env": {
-        "PROJECT_PATH": "${discoveredProjects.length > 0 ? discoveredProjects[0].projectPath.replace(/\\/g, '\\\\') : 'D:\\\\\\\\MEGA\\\\\\\\Projects\\\\\\\\your-project'}"
-      }
-    }
-  }
-}
-\`\`\`
-
-### Solution 2: Modify Launch Directory
-Ensure MCP server starts from correct project directory:
-\`\`\`json
-{
-  "mcpServers": {
-    "quality-dimension-generator": {
-      "command": "node",
-      "args": ["path/to/server"],
-      "cwd": "${discoveredProjects.length > 0 ? discoveredProjects[0].projectPath.replace(/\\/g, '\\\\') : 'D:\\\\\\\\MEGA\\\\\\\\Projects\\\\\\\\your-project'}"
-    }
-  }
-}
-\`\`\`
-
-### Solution 3: Manually Specify Project Path
-Explicitly specify project path parameter when using tools.
-
-## 🎯 Recommended Actions
-1. Check MCP configuration file (\`claude_desktop_config.json\` or VS Code settings)
-2. Add \`cwd\` configuration pointing to project root directory
-3. Or set \`PROJECT_PATH\` environment variable
-4. Restart MCP server/client application
-
-${discoveredProjects.length > 0 ? '\n## 🔧 Quick Fix\nBased on discovered .qdg directories, recommend setting working directory to the corresponding project root directory.' : ''}
-`;
-
-					return {
-						content: [{
-							type: "text",
-							text: diagnosticInfo
-						}]
-					};
-				} catch (error) {
-					return {
-						content: [{
-							type: "text",
-							text: `Diagnosis failed: ${error instanceof Error ? error.message : String(error)}`
-						}],
-						isError: true
-					};
-				}
-			}
-		);
-	}
 
 	return server; // For Smithery deployment, this should be the McpServer instance
 }

@@ -4,21 +4,21 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
  * MCP Quality Dimension Generator - Tool Schema Definitions
  * Standard interface for LLMs to understand and call quality evaluation tools
  * 
- * Tool Usage Order:
- * 1. TASK_ANALYSIS_PROMPT_TOOL         - Analyze task
- * 2. QUALITY_DIMENSIONS_PROMPT_TOOL    - Generate prompts  
- * 3. SAVE_QUALITY_DIMENSIONS_TOOL      - Save LLM output
- * 4. TIME_CONTEXT_TOOL                 - Helper: Time context
- * 5. DIAGNOSE_WORKING_DIRECTORY_TOOL   - Helper: Directory diagnosis
+ * Core 3-Step Workflow:
+ * 1. TASK_ANALYSIS_PROMPT_TOOL         - Analyze user task and generate analysis prompt
+ * 2. QUALITY_DIMENSIONS_PROMPT_TOOL    - Generate quality evaluation standards prompt
+ * 3. SAVE_QUALITY_DIMENSIONS_TOOL      - Save LLM-generated task refinement and evaluation dimensions
+ * 
+ * Purpose: Let LLM fully understand tasks and establish clear quality standards before execution
  */
 
 /**
  * Task analysis prompt generation tool
- * Generates structured prompts for LLM to analyze user tasks with enhanced workflow guidance
+ * Generates structured prompts for LLM to analyze user tasks automatically
  */
 export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 	name: 'generate_task_analysis_prompt',
-	description: 'Generate task analysis prompt for LLM to analyze core tasks in user conversations with workflow guidance and next-step instructions',
+	description: 'Generate task analysis prompt for LLM to analyze core tasks in user conversations',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -28,7 +28,7 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 			},
 			conversationHistory: {
 				type: 'array',
-				description: 'Conversation history (optional)',
+				description: 'Conversation history records',
 				items: {
 					type: 'object',
 					properties: {
@@ -51,7 +51,7 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 			},
 			context: {
 				type: 'object',
-				description: 'Additional context information (optional)',
+				description: 'Additional context information',
 				additionalProperties: true
 			}
 		},
@@ -61,11 +61,11 @@ export const TASK_ANALYSIS_PROMPT_TOOL: Tool = {
 
 /**
  * Quality dimension prompt generator tool
- * Creates comprehensive evaluation frameworks with flat file structure and progress tracking
+ * Creates comprehensive evaluation frameworks and task records with automatic .qdg directory setup
  */
 export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 	name: 'generate_quality_dimensions_prompt',
-	description: 'Generate quality dimension prompts and create task records with flat file structure, providing comprehensive workflow guidance and progress tracking',
+	description: 'Generate quality dimensions prompt and create task records. Use targetScore (8 default) to set evaluation strictness: higher scores create stricter professional standards, lower scores create more lenient learning-focused criteria.',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -80,7 +80,7 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 			},
 			timezone: {
 				type: 'string',
-				description: 'Timezone (optional)'
+				description: 'Timezone'
 			},
 			locale: {
 				type: 'string',
@@ -89,7 +89,7 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 			},
 			projectPath: {
 				type: 'string',
-				description: 'Project path (optional, used to save task records)'
+				description: 'Project path (optional, for saving task records)'
 			}
 		},
 		required: ['taskAnalysisJson']
@@ -97,12 +97,12 @@ export const QUALITY_DIMENSIONS_PROMPT_TOOL: Tool = {
 };
 
 /**
- * Quality dimension save tool - Save LLM dual-output results with semantic naming
- * Implements flat file structure with taskId_taskName.md naming convention
+ * Quality dimension save tool
+ * Save LLM-generated task refinement and evaluation dimensions with flat file structure
  */
 export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 	name: 'save_quality_dimensions',
-	description: 'Save LLM-generated task refinement and evaluation dimension standards to .qdg directory using flat file structure with semantic naming',
+	description: 'Save LLM-generated task refinement and evaluation dimension standards to .qdg directory',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -132,56 +132,15 @@ export const SAVE_QUALITY_DIMENSIONS_TOOL: Tool = {
 };
 
 /**
- * Time context tool
- */
-export const TIME_CONTEXT_TOOL: Tool = {
-	name: 'get_current_time_context',
-	description: 'Get current basic time context information (auto-detect system timezone)',
-	inputSchema: {
-		type: 'object',
-		properties: {
-			timezone: {
-				type: 'string',
-				description: 'Timezone (optional, auto-detect system timezone if not specified)'
-			},
-			locale: {
-				type: 'string',
-				description: 'Localization settings',
-				default: 'zh-CN'
-			}
-		}
-	}
-};
-
-/**
- * Working directory diagnosis tool
- * Provides comprehensive environment diagnosis with troubleshooting guidance
- */
-export const DIAGNOSE_WORKING_DIRECTORY_TOOL: Tool = {
-	name: 'diagnose_working_directory',
-	description: 'Diagnose current working directory and MCP server runtime environment with detailed troubleshooting guidance and project discovery',
-	inputSchema: {
-		type: 'object',
-		properties: {}
-	}
-};
-
-/**
- * Tool exports - ordered by usage frequency
+ * All available tools - Core 3-step workflow only
  */
 export const ALL_TOOLS = [
 	TASK_ANALYSIS_PROMPT_TOOL,         // Step 1: Analyze task
-	QUALITY_DIMENSIONS_PROMPT_TOOL,    // Step 2: Generate prompts
-	SAVE_QUALITY_DIMENSIONS_TOOL,      // Step 3: Save LLM output
-	TIME_CONTEXT_TOOL,                 // Helper: Time context
-	DIAGNOSE_WORKING_DIRECTORY_TOOL    // Helper: Directory diagnosis
+	QUALITY_DIMENSIONS_PROMPT_TOOL,    // Step 2: Generate quality standards
+	SAVE_QUALITY_DIMENSIONS_TOOL       // Step 3: Save LLM output
 ] as const;
 
 /**
- * Core workflow tools (recommended usage order)
+ * Core workflow tools (same as ALL_TOOLS since we only expose 3 core tools)
  */
-export const CORE_WORKFLOW_TOOLS = [
-	TASK_ANALYSIS_PROMPT_TOOL,
-	QUALITY_DIMENSIONS_PROMPT_TOOL,
-	SAVE_QUALITY_DIMENSIONS_TOOL
-] as const;
+export const CORE_WORKFLOW_TOOLS = ALL_TOOLS;

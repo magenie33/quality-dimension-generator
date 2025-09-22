@@ -25,7 +25,7 @@ Please analyze according to the following dimensions and output the result in JS
 \`\`\`json
 {
   "coreTask": "Description of the user's core task",
-  "taskName": "Concise task name (suitable for file naming, can be in Chinese or English)",
+  "taskName": "Concise task name (suitable for file naming, can be in any language)",
   "taskType": "Task type (e.g., development, design, analysis, learning, management, consulting, etc.)",
   "complexity": Complexity level (1-5),
   "domain": "Task domain (e.g., technical development, business management, education and training, etc.)",
