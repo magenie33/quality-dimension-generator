@@ -1,5 +1,4 @@
 import { EvaluationDimension, TaskAnalysis, TimeContext } from './types.js';
-import { ConfigManager } from './configManager.js';
 
 /**
  * Quality Evaluation Dimension Generator
@@ -7,10 +6,12 @@ import { ConfigManager } from './configManager.js';
  * Note: 3-tier guidelines (6, 8, 10 points) are for guidance only, actual scoring can be any number 0-10
  */
 export class QualityDimensionGenerator {
-	private configManager: ConfigManager;
+	private dimensionCount: number;
+	private expectedScore: number;
 	
-	constructor() {
-		this.configManager = new ConfigManager();
+	constructor(config: { dimensionCount: number; expectedScore: number } = { dimensionCount: 5, expectedScore: 8 }) {
+		this.dimensionCount = config.dimensionCount;
+		this.expectedScore = config.expectedScore;
 	}
 	
 	/**
@@ -22,14 +23,9 @@ export class QualityDimensionGenerator {
 		projectPath?: string,
 		targetScore?: number
 	): Promise<string> {
-		// Get configuration
-		const dimensionCount = projectPath 
-			? await this.configManager.getDimensionCount(projectPath)
-			: 5; // Default 5 dimensions
-			
-		const expectedScore = targetScore ?? (projectPath 
-			? await this.configManager.getExpectedScore(projectPath)
-			: 8); // Default expected score 8
+		// Use instance configuration or provided target score
+		const dimensionCount = this.dimensionCount;
+		const expectedScore = targetScore ?? this.expectedScore;
 
 		return `🎯 **Important Note: Please strictly follow the format to ensure proper parsing and saving by subsequent programs!**
 

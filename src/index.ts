@@ -15,7 +15,6 @@ import { TaskExtractor } from './lib/taskExtractor.js';
 import { TimeContextManager } from './lib/timeContextManager.js';
 import { QualityDimensionGenerator } from './lib/qualityDimensionGenerator.js';
 import { QdgDirectoryManager } from './lib/qdgDirectoryManager.js';
-import { ConfigManager } from './lib/configManager.js';
 
 /**
  * Quality Dimension Generator MCP Server
@@ -27,7 +26,9 @@ import { ConfigManager } from './lib/configManager.js';
 // Configuration schema
 const configSchema = z.object({
 	enabledTools: z.array(z.string()).optional().describe("List of tools to enable"),
-	debug: z.boolean().default(false).describe("Enable debug logging")
+	debug: z.boolean().default(false).describe("Enable debug logging"),
+	dimensionCount: z.number().default(5).describe("Number of quality dimensions to generate (default: 5)"),
+	expectedScore: z.number().default(8).describe("Expected target score for quality evaluation (0-10 scale, default: 8)")
 });
 
 // Export configuration for Smithery CLI
@@ -39,7 +40,9 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 	// Apply defaults
 	const finalConfig = {
 		debug: config.debug ?? false,
-		enabledTools: config.enabledTools
+		enabledTools: config.enabledTools,
+		dimensionCount: config.dimensionCount ?? 5,
+		expectedScore: config.expectedScore ?? 8
 	};
 	
 	// Create server instance
@@ -52,9 +55,8 @@ export default function createServer(config: Partial<z.infer<typeof configSchema
 	// Initialize service classes
 	const taskExtractor = new TaskExtractor();
 	const timeContextManager = new TimeContextManager();
-	const dimensionGenerator = new QualityDimensionGenerator();
+	const dimensionGenerator = new QualityDimensionGenerator(finalConfig);
 	const qdgManager = new QdgDirectoryManager();
-	const configManager = new ConfigManager();
 
 	// Helper function to generate task ID
 	const generateTaskId = (): string => {
@@ -233,7 +235,7 @@ ${prompt}
 📋 **LLM INSTRUCTIONS - Execute Automatically:**
 
 **Step 1**: Execute the prompt below to get task analysis JSON
-**Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON (optional: set targetScore 1-10 to adjust evaluation strictness, default=8)
+**Step 2**: Call \`generate_quality_dimensions_prompt\` with the JSON and targetScore (1-10 to set evaluation strictness)
 **Step 3**: Optionally call \`save_quality_dimensions\` to save standards to .qdg directory (will auto-create directory)
 
 ⚠️ **LLM**: Execute the prompt below to get JSON output, then automatically proceed to Stage 2!
@@ -268,14 +270,12 @@ ${prompt}
 	if (isToolEnabled('generate_quality_dimensions_prompt')) {
 		server.tool(
 			"generate_quality_dimensions_prompt",
-			"Generate quality dimensions prompt and create task records. Use targetScore (8 default) to set evaluation strictness: higher scores create stricter professional standards, lower scores create more lenient learning-focused criteria.",
+			"Generate quality dimensions prompt and create task records. targetScore is required to set evaluation strictness: higher scores create stricter professional standards, lower scores create more lenient learning-focused criteria.",
 			{
 				taskAnalysisJson: z.string().describe("Task analysis JSON result"),
-				targetScore: z.number().default(8).describe("Target score (0-10 scale, used to guide evaluation criteria strictness)"),
-				timezone: z.string().optional().describe("Timezone"),
-				locale: z.string().default("en-US").describe("Localization settings")
+				targetScore: z.number().describe("REQUIRED: Target score (0-10 scale, used to guide evaluation criteria strictness). Higher scores (8-10) = stricter standards, Lower scores (5-7) = more lenient standards")
 			},
-			async ({ taskAnalysisJson, targetScore, timezone, locale }) => {
+			async ({ taskAnalysisJson, targetScore }) => {
 				try {
 					// Parse task analysis result
 					const task: TaskAnalysis = JSON.parse(taskAnalysisJson);
@@ -295,8 +295,8 @@ ${prompt}
 					const timestamp = Date.now();
 					const taskId = `task_${timestamp}_${taskHash}`;
 					
-					// Get time context (system will auto-detect timezone)
-					const timeContext = timeContextManager.getCurrentTimeContext(timezone, locale);
+					// Get time context (use system defaults)
+					const timeContext = timeContextManager.getCurrentTimeContext();
 					
 					// Generate prompt (no project path for this step)
 					const prompt = await dimensionGenerator.generateDimensionsPrompt(task, timeContext, undefined, targetScore);
@@ -350,46 +350,30 @@ ${prompt}
 	if (isToolEnabled('save_quality_dimensions')) {
 		server.tool(
 			"save_quality_dimensions",
-			"Save LLM-generated task refinement and evaluation dimension standards to .qdg directory. Will automatically create .qdg directory structure in current working directory if projectPath not provided.",
+			"Save LLM-generated task refinement and evaluation dimension standards to .qdg directory. LLM must provide absolute path to target directory.",
 			{
 				taskId: z.string().describe("Task ID"),
+				taskName: z.string().describe("Task name"),
 				refinedTaskDescription: z.string().describe("LLM-refined task description (first stage output)"),
 				dimensionsContent: z.string().describe("LLM-generated complete evaluation dimension content (second stage output)"),
-				taskAnalysisJson: z.string().optional().describe("Original task analysis JSON (optional, for basic information)"),
-				projectPath: z.string().optional().describe("Optional: Absolute path to the project directory where .qdg should be created. If not provided, will use current working directory.")
+				projectPath: z.string().describe("REQUIRED: Absolute path to the project directory where .qdg should be created (e.g., 'C:\\\\Users\\\\Username\\\\Projects\\\\MyProject' or '/home/user/my-project'). LLM must determine and provide appropriate absolute path.")
 			},
-			async ({ taskId, refinedTaskDescription, dimensionsContent, taskAnalysisJson, projectPath }) => {
+			async ({ taskId, taskName, refinedTaskDescription, dimensionsContent, projectPath }) => {
 				try {
-					// Use current working directory if no projectPath provided
-					const targetProjectPath = projectPath || process.cwd();
-					
-					// Ensure .qdg directory
-					const resolvedProjectPath = await ensureQdgDirectory(targetProjectPath);
+					// Ensure .qdg directory at the specified absolute path
+					const resolvedProjectPath = await ensureQdgDirectory(projectPath);
 					
 					if (!resolvedProjectPath) {
-						throw new Error(`Failed to initialize .qdg directory at: ${targetProjectPath}`);
+						throw new Error(`Failed to initialize .qdg directory at: ${projectPath}`);
 					}
-					
-					// Parse task analysis (if provided)
-					let task: any = {};
-					if (taskAnalysisJson) {
-						try {
-							task = JSON.parse(taskAnalysisJson);
-						} catch (parseError) {
-							console.warn('Failed to parse taskAnalysisJson, continuing:', parseError);
-						}
-					}
-					
-					// Extract task name from task analysis or use fallback
-					const taskName = task.taskName || 'UnnamedTask';
 					
 					if (resolvedProjectPath) {
-						// Save using new flat file structure with LLM-generated task name
+						// Save using new flat file structure with provided task name
 						const outputFilePath = await qdgManager.saveFinalDimensionStandardsFlat(
 							resolvedProjectPath, 
 							taskId,
 							taskName,
-							task,
+							{}, // Empty task object since we don't need taskAnalysisJson anymore
 							refinedTaskDescription,
 							dimensionsContent
 						);
@@ -439,7 +423,6 @@ ${prompt}
 - **Task ID**: ${taskId}
 - **Task Name**: ${taskName}
 - **Creation Time**: ${new Date().toLocaleString('en-US')}
-- **Core Task**: ${task.coreTask || 'Not specified'}
 
 ---
 

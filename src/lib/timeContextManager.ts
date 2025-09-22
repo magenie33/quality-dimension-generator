@@ -8,20 +8,21 @@ export class TimeContextManager {
 	/**
 	 * Get current time context
 	 */
-	public getCurrentTimeContext(timezone?: string, locale = 'en-US'): TimeContext {
+	public getCurrentTimeContext(timezone?: string, locale?: string): TimeContext {
 		const now = new Date();
+		const systemLocale = locale || this.getSystemLocale();
 		
 		// Convert time if timezone is specified
 		const targetTime = timezone ? this.convertToTimezone(now, timezone) : now;
 		
 		return {
 			timestamp: targetTime.getTime(),
-			formattedTime: this.formatDateTime(targetTime, locale),
+			formattedTime: this.formatDateTime(targetTime, systemLocale),
 			timezone: timezone || this.getSystemTimezone(),
 			year: targetTime.getFullYear(),
 			month: targetTime.getMonth() + 1, // JavaScript months start from 0
 			day: targetTime.getDate(),
-			weekday: this.getWeekdayName(targetTime, locale)
+			weekday: this.getWeekdayName(targetTime, systemLocale)
 		};
 	}
 
@@ -70,6 +71,19 @@ export class TimeContextManager {
 			return Intl.DateTimeFormat().resolvedOptions().timeZone;
 		} catch {
 			return 'UTC';
+		}
+	}
+
+	/**
+	 * Get system locale
+	 */
+	private getSystemLocale(): string {
+		try {
+			// Try to get system locale from Intl
+			return Intl.DateTimeFormat().resolvedOptions().locale;
+		} catch {
+			// Fallback to en-US if detection fails
+			return 'en-US';
 		}
 	}
 

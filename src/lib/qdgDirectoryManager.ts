@@ -7,10 +7,11 @@ import { join } from 'path';
  * 
  * Directory structure:
  * .qdg/
- * ├── config/          - Configuration files
  * └── tasks/           - Task records (flat files with semantic naming)
  *     ├── TaskId_TaskName.md  - Individual task files
  *     └── TaskId2_AnotherTask.md
+ * 
+ * Note: Configuration is handled via installation parameters, not config files
  */
 export class QdgDirectoryManager {
 	private readonly QDG_DIR_NAME = '.qdg';
@@ -30,14 +31,13 @@ export class QdgDirectoryManager {
 		const qdgDir = this.getQdgDirectory(projectPath);
 		return {
 			qdgDir,
-			tasks: join(qdgDir, 'tasks'),
-			config: join(qdgDir, 'config')
+			tasks: join(qdgDir, 'tasks')
 		};
 	}
 	
 	/**
 	 * Initialize .qdg directory structure
-	 * Create necessary subdirectories and configuration files
+	 * Create only tasks directory (no config folder)
 	 */
 	async initializeQdgDirectory(projectPath: string): Promise<{
 		qdgDir: string;
@@ -48,7 +48,7 @@ export class QdgDirectoryManager {
 		const created: string[] = [];
 		const existed: string[] = [];
 		
-		// Create all necessary directories
+		// Create necessary directories (only tasks)
 		for (const [name, dirPath] of Object.entries(dirs)) {
 			try {
 				await fs.mkdir(dirPath, { recursive: true });
@@ -59,9 +59,9 @@ export class QdgDirectoryManager {
 					if (stats.isDirectory()) {
 						// Check if directory is empty to determine if newly created
 						const files = await fs.readdir(dirPath);
-						if (files.length === 0 && name !== 'qetDir') {
+						if (files.length === 0 && name !== 'qdgDir') {
 							created.push(name);
-						} else if (name !== 'qetDir') {
+						} else if (name !== 'qdgDir') {
 							existed.push(name);
 						}
 					}
@@ -73,36 +73,11 @@ export class QdgDirectoryManager {
 			}
 		}
 		
-		// Create configuration files
-		await this.createConfigFiles(dirs);
-		
 		return {
 			qdgDir: dirs.qdgDir,
 			created,
 			existed
 		};
-	}
-	
-	/**
-	 * Create default configuration files
-	 */
-	private async createConfigFiles(dirs: ReturnType<typeof this.getSubDirectories>): Promise<void> {
-		// Create main configuration file
-		const mainConfigPath = join(dirs.config, 'qdg.config.json');
-		try {
-			await fs.access(mainConfigPath);
-			// File already exists, do not overwrite
-		} catch {
-			// File does not exist, create default configuration (settings only)
-			const defaultConfig = {
-				settings: {
-					dimensionCount: 5,    // Default 5 dimensions
-					expectedScore: 8      // Default expected score 8
-				}
-			};
-			
-			await fs.writeFile(mainConfigPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
-		}
 	}
 	
 	/**
@@ -135,27 +110,6 @@ export class QdgDirectoryManager {
 			return stats.isDirectory();
 		} catch {
 			return false;
-		}
-	}
-
-	/**
-	 * Get QDG configuration
-	 */
-	async getQdgConfig(projectPath: string): Promise<any> {
-		const dirs = this.getSubDirectories(projectPath);
-		const configPath = join(dirs.config, 'qdg.config.json');
-		
-		try {
-			const content = await fs.readFile(configPath, 'utf-8');
-			return JSON.parse(content);
-		} catch {
-			// Return default configuration (settings only)
-			return {
-				settings: {
-					dimensionCount: 5,    // Default 5 dimensions
-					expectedScore: 8      // Default expected score 8
-				}
-			};
 		}
 	}
 
